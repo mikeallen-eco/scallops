@@ -5,28 +5,62 @@ date: "10/29/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-test <- c("hi", "bye", "see ya", "take care", "hallo hallo",
-          "g'bye")
+# load libraries and data
+```{r}
+library(tidyverse)
+options(scipen = n)
+
+# read in data (and describe in comments)
+
+# metadata on the different cruises
+cruise_details <- read.csv("data/noaa/22564_MASTER_CRUISE_DETAILS.csv")
+
+# metadata on the types of data collected on cruises?
+cruise_tab <- read.csv("data/noaa/22564_MASTER_CRUISE_TABLE.csv")
+
+# more info on the cruises (fewer; just those that did scallop survey?)
+svdbs_cruises <- read.csv("data/noaa/22564_SVDBS_CRUISES.csv")
+
+# scallop data from cruises 
+# (including length, sex, mass, maturity, stomach volume/weight, some age)
+svbio <- read.csv("data/noaa/22564_UNION_FSCS_SVBIO.csv")
+
+# additional info on scallops (less info, more records??)
+svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv")
+
+# additional scallop data (mainly length, sex; 
+# way more records (>500k) including several per tow/station
+svlen <- read.csv("data/noaa/22564_UNION_FSCS_SVLEN.csv")
+
+# cruise/tow/station location and depth info
+svsta <- read.csv("data/noaa/22564_UNION_FSCS_SVSTA.csv")
+
+# cloud cover code lookup
+svdbs_cloud <- read.csv("data/noaa/SVDBS_CLOUD.csv")
+
+# maturity code lookup
+svdbs_mat_codes <- read.csv("data/noaa/SVDBS_MATURITY_CODES.csv")
+
+# sex code lookup
+svdbs_sex_codes <- read.csv("data/noaa/SVDBS_SEX_CODES.csv")
+
+# gear code lookup (detailed info on what gear was used)
+svdbs_gear <- read.csv("data/noaa/SVDBS_SVGEAR.csv")
+
+# strata code lookup with area, mid-pt coords, name, etc.
+svdbs_mstrata <- read.csv("data/noaa/SVDBS_SVMSTRATA.csv")
+
+# species code lookup
+svdbs_species <- read.csv("data/noaa/SVDBS_SVSPECIES_LIST.csv")
+
+# vessel abbreviation lookup
+svdbs_vessel <- read.csv("data/noaa/SVDBS_SVVESSEL.csv")
+
+# weather code lookup
+svdbs_weather <- read.csv("data/noaa/SVDBS_WEATHER.csv")
+
+# temperature data device lookup (analog, hydrolab, seabird, etc.)
+svdbs_xbt <- read.csv("data/noaa/SVDBS_XBT.csv")
+
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
