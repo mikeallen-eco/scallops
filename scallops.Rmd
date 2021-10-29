@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-test <- c("hi", "bye", "see ya")
+test <- c("hi", "bye", "see ya", "take care")
 ```
 
 ## R Markdown
