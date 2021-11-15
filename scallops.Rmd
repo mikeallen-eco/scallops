@@ -21,16 +21,23 @@ cruise_tab <- read.csv("data/noaa/22564_MASTER_CRUISE_TABLE.csv")
 # more info on the cruises (fewer; just those that did scallop survey?)
 svdbs_cruises <- read.csv("data/noaa/22564_SVDBS_CRUISES.csv")
 
-# scallop data from cruises 
+# scallop  data by individual from each tow 
 # (including length, sex, mass, maturity, stomach volume/weight, some age)
-svbio <- read.csv("data/noaa/22564_UNION_FSCS_SVBIO.csv")
+# missing data from 1980-2004
+svbio <- read.csv("data/noaa/22564_UNION_FSCS_SVBIO.csv") %>%
+  filter(SVSPP == 401)# 26490 rows before spp filtering
 
-# additional info on scallops (less info, more records??)
-svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv")
+# aggregated scallop number and total weight caught per tow
+svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv") %>%
+  filter(SVSPP == 401)
 
-# additional scallop data (mainly length, sex; 
-# way more records (>500k) including several per tow/station
-svlen <- read.csv("data/noaa/22564_UNION_FSCS_SVLEN.csv")
+# full scallop data aggregated by length measurements
+# EXPANDED.NUMBER.AT.LENGTH = # recorded with that length; 
+# way more records (>500k) than svbio or svcat
+# data field descriptions here: https://www.fisheries.noaa.gov/inport/item/33729/printable-form
+# 
+svlen <- read.csv("data/noaa/22564_UNION_FSCS_SVLEN.csv") %>%
+  filter(SVSPP == 401)
 
 # cruise/tow/station location and depth info
 svsta <- read.csv("data/noaa/22564_UNION_FSCS_SVSTA.csv")
@@ -62,5 +69,84 @@ svdbs_weather <- read.csv("data/noaa/SVDBS_WEATHER.csv")
 # temperature data device lookup (analog, hydrolab, seabird, etc.)
 svdbs_xbt <- read.csv("data/noaa/SVDBS_XBT.csv")
 
+# summarizing data for the SVLEN data set
+svlen_sum = svlen %>%
+  mutate(
+    exp_num2 = tidyr::replace_na(EXPANDED.NUMBER.AT.LENGTH, 1),
+    sizecat = case_when(
+    LENGTH <= 6.5 ~ "< 65 mm",
+    LENGTH > 6.5 & LENGTH < 8.8 ~ "65-88 mm",
+    LENGTH >= 8.8 ~ "> 88 mm"
+  )) %>%
+  group_by(CRUISE6, STRATUM, TOW, sizecat) %>%
+  summarize(n = sum(EXPANDED.NUMBER.AT.LENGTH),
+            n2 = sum(exp_num2),
+            .groups = "drop") %>%
+  mutate(year = substr(CRUISE6, 1, 4))
+
+# all tow/size groups
+temp = svlen %>%
+  select(CRUISE6, STRATUM, TOW) %>%
+  #mutate(id = paste(CRUISE6, STRATUM, TOW, sep = "-")) %>%
+  distinct()
+
+svlen_sum_size <- temp %>%
+  bind_rows(temp) %>%
+  bind_rows(temp) %>%
+  mutate(year = substr(CRUISE6,1,4),
+         sizecat = c(rep("< 65 mm", 15447),
+           rep("65-88 mm", 15447),
+           rep("> 88 mm", 15447))) %>%
+  left_join(svlen_sum, by = c("CRUISE6", "STRATUM", 
+                              "TOW", "sizecat", "year")) %>%
+  replace_na(replace = list(n = 0, n2 = 0))
+
+
+```
+# Plot no. tows per year
+```{r}
+# ~ 100 - 500 tows / year, 1977-2019
+tows_per_yr <- as.data.frame(table(svlen_sum$year)) 
+ggplot(tows_per_yr, aes(Var1, Freq, group = 1)) + 
+  geom_point() + 
+  geom_line() +
+  scale_x_discrete(breaks = seq(1980,2020, by = 5)) +
+  labs(x = "", y = "Tows / year") +
+  theme_bw()+
+  theme(text = element_text(size = 14))
+```
+# plot mean n per tow per year for each size class
+```{r}
+svlen_sum_size %>%
+  group_by(year, sizecat) %>%
+  summarize(mean_n = mean(n),
+            .groups = "drop") %>%
+  ggplot() +
+  geom_line(aes(x = as.numeric(year), 
+                y = mean_n, 
+               color = sizecat),
+            size = 1) +
+  scale_color_manual(values = 
+                       wesanderson::wes_palette(
+                         name = "Darjeeling1")) +
+  labs(x = "", y = "Mean no. per tow", color = "Size") +
+  theme_bw() +
+  theme(text = element_text(size = 15))
+
+ggsave("figures/mean_n_by_size_category.jpg",
+       height = 4, width = 6, dpi = 400)
+
+```
+# Plot length by age
+From svbio database
+```{r}
+svbio %>%
+  ggplot() +
+  geom_boxplot(aes(x = as.factor(AGE), y = LENGTH*10)) +
+  theme_bw() +
+  theme(text = element_text(size = 15)) +
+  labs(x = "Age (years)", y = "Length (mm)")
+# ggsave("figures/length_by_age.jpg", 
+#        height = 4, width = 6, dpi = 400)
 ```
 
