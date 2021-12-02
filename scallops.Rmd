@@ -8,7 +8,9 @@ output: html_document
 # load libraries and data
 ```{r}
 library(tidyverse)
-options(scipen = n)
+library(sf)
+library(rnaturalearth)
+is.odd <- function(x) x %% 2 != 0
 
 # read in data (and describe in comments)
 
@@ -27,7 +29,7 @@ svdbs_cruises <- read.csv("data/noaa/22564_SVDBS_CRUISES.csv")
 svbio <- read.csv("data/noaa/22564_UNION_FSCS_SVBIO.csv") %>%
   filter(SVSPP == 401)# 26490 rows before spp filtering
 
-# aggregated scallop number and total weight caught per tow
+# scallop number and total weight caught per tow
 svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv") %>%
   filter(SVSPP == 401)
 
@@ -70,7 +72,7 @@ svdbs_weather <- read.csv("data/noaa/SVDBS_WEATHER.csv")
 svdbs_xbt <- read.csv("data/noaa/SVDBS_XBT.csv")
 
 # summarizing data for the SVLEN data set
-svlen_sum = svlen %>%
+svlen_sum_temp = svlen %>%
   mutate(
     exp_num2 = tidyr::replace_na(EXPANDED.NUMBER.AT.LENGTH, 1),
     sizecat = case_when(
@@ -78,7 +80,7 @@ svlen_sum = svlen %>%
     LENGTH > 6.5 & LENGTH < 8.8 ~ "65-88 mm",
     LENGTH >= 8.8 ~ "> 88 mm"
   )) %>%
-  group_by(CRUISE6, STRATUM, TOW, sizecat) %>%
+  group_by(CRUISE6, STRATUM, TOW, STATION, sizecat) %>%
   summarize(n = sum(EXPANDED.NUMBER.AT.LENGTH),
             n2 = sum(exp_num2),
             .groups = "drop") %>%
@@ -86,28 +88,87 @@ svlen_sum = svlen %>%
 
 # all tow/size groups
 temp = svlen %>%
-  select(CRUISE6, STRATUM, TOW) %>%
-  #mutate(id = paste(CRUISE6, STRATUM, TOW, sep = "-")) %>%
+  select(CRUISE6, STRATUM, TOW, STATION) %>%
   distinct()
 
-svlen_sum_size <- temp %>%
+sc <- temp %>%
   bind_rows(temp) %>%
   bind_rows(temp) %>%
   mutate(year = substr(CRUISE6,1,4),
          sizecat = c(rep("< 65 mm", 15447),
            rep("65-88 mm", 15447),
            rep("> 88 mm", 15447))) %>%
-  left_join(svlen_sum, by = c("CRUISE6", "STRATUM", 
-                              "TOW", "sizecat", "year")) %>%
-  replace_na(replace = list(n = 0, n2 = 0))
+  left_join(svlen_sum_temp, by = c("CRUISE6", "STRATUM", 
+                              "TOW", "STATION", 
+                              "sizecat", "year")) %>%
+  replace_na(replace = list(n = 0, n2 = 0)) %>%
+  # add in the depth and lat/long info
+  left_join(select(svsta, CRUISE6, STRATUM, TOW, STATION, 
+                   AVGDEPTH, DECDEG_BEGLAT, DECDEG_BEGLON),
+            by = c("CRUISE6", "STRATUM", "TOW", "STATION")) %>%
+  mutate(lat = DECDEG_BEGLAT,
+         lon = DECDEG_BEGLON,
+         order = case_when(sizecat == "< 65 mm" ~ 1,
+                           sizecat == "65-88 mm" ~ 2,
+                           sizecat == "> 88 mm" ~ 3)) %>%
+  mutate(sizecat = forcats::fct_reorder(sizecat, order)) %>%
+  select(-order) %>%
+  filter(year>=1980) %>%
+  mutate(decade = case_when(year<1990 ~ "1980s", 
+                            year>=1990 & year <2000 ~ "1990s",
+                            year>=2000 ~ "2000s-2010s"),
+         grid_lat = trunc(lat)+0.5,
+         grid_lon = trunc(lon)-0.5,
+         grid = paste0(grid_lat,grid_lon))
+rm(svlen_sum_temp, temp)
 
+# summarize mean scallop abundance by 1x1 grid cells
+sc1d <- sc %>%
+  mutate(lat = grid_lat,
+         lon = grid_lon) %>%
+  group_by(grid, year, decade, lat, lon, 
+           grid_lat, grid_lon, sizecat) %>%
+  summarize(mean_n = mean(n),
+            n_tows = length(n),
+            mean_depth = mean(AVGDEPTH),
+            .groups = "drop") %>%
+  arrange(grid, year)
 
+# load spatial data
+sc_sf <- sc %>%
+  st_as_sf(coords = c("lon", "lat"),
+           crs = 4326)
+
+sc1d_sf <- sc1d %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- ne_coastline(scale = 110, returnclass = "sf") %>%
+  st_crop(svlen_sum_sf)
 ```
+# Plot tows
+```{r}
+# plot scallop abundance by size and decade
+sc_sf %>%
+ggplot() +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +
+  geom_sf(aes(color = log10(n+1)), alpha = 0.3, size = 0.25) +
+  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  facet_grid(rows = vars(decade), cols = vars(sizecat))
+
+# ggsave("figures/scallop_maps12.png", 
+#        height = 7, width = 7, dpi = 800)
+```
+
 # Plot no. tows per year
 ```{r}
 # ~ 100 - 500 tows / year, 1977-2019
-tows_per_yr <- as.data.frame(table(svlen_sum$year)) 
-ggplot(tows_per_yr, aes(Var1, Freq, group = 1)) + 
+as.data.frame(table(svlen_sum$year)) %>%
+ggplot(aes(Var1, Freq, group = 1)) + 
   geom_point() + 
   geom_line() +
   scale_x_discrete(breaks = seq(1980,2020, by = 5)) +
@@ -133,7 +194,7 @@ svlen_sum_size %>%
   theme_bw() +
   theme(text = element_text(size = 15))
 
-ggsave("figures/mean_n_by_size_category.jpg",
+ggsave("figures/mean_n_by_size_category2.jpg",
        height = 4, width = 6, dpi = 400)
 
 ```
@@ -148,5 +209,103 @@ svbio %>%
   labs(x = "Age (years)", y = "Length (mm)")
 # ggsave("figures/length_by_age.jpg", 
 #        height = 4, width = 6, dpi = 400)
+```
+# Plot 1x1 degree grid cell averages
+```{r}
+# summarize # tows by decade
+sc1d_sf %>%
+  group_by(grid, lat, lon, decade) %>%
+  summarize(mean_tows = mean(n_tows),
+            .groups = "drop") %>%
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_tows), 
+            alpha = 1, size = 0.25) +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 8)) +
+  viridis::scale_fill_viridis(option = "inferno") +
+  labs(x = "", y = "") +
+  facet_wrap(~decade)
+
+ggsave("figures/scallop_grid_1d_tows_by_decade.png",
+       height = 3, width = 7, dpi = 400)
+
+```
+```{r}
+# summarize mean depth by cell
+sc1d_sf %>%
+  group_by(grid, lat, lon) %>%
+  summarize(mean_depth = mean(mean_depth),
+            .groups = "drop") %>%
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_depth), 
+            alpha = 1, size = 0.25) +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 8)) +
+  viridis::scale_fill_viridis(option = "inferno") +
+  labs(x = "", y = "")
+
+
+ggsave("figures/scallop_grid_1d_mean_depth.png",
+       height = 7, width = 7, dpi = 400)
+
+```
+```{r}
+# summarize mean catch by decade
+sc1d_sf %>%
+  group_by(grid, lat, lon, sizecat, decade) %>%
+  summarize(mean_catch = mean(mean_n),
+            .groups = "drop") %>%
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = log10(mean_catch+1)), 
+            alpha = 1, size = 0.25) +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 8)) +
+  viridis::scale_fill_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "log10(n+1)") +
+  facet_grid(rows = vars(decade), cols = vars(sizecat))
+
+ggsave("figures/scallop_grid_1d_mean_catch_by_decade.png",
+       height = 7, width = 7, dpi = 400)
+```
+
+
+# plot time series for cells with > 10 tows / year (average)
+```{r}
+ts_plot_data <- sc1d_sf %>%
+  group_by(grid, sizecat, decade) %>%
+  mutate(mean_tows = mean(n_tows)) %>%
+  group_by(grid, sizecat) %>%
+  mutate(n_years = length(n_tows)) %>%
+  filter(mean_tows >= 10,
+         n_years > 2,
+         n_tows > 5)
+
+length(unique(ts_plot_data$grid))
+
+ts_plot_data %>%
+  group_by(grid, lat, sizecat, year) %>%
+  summarize(mean_n = mean(mean_n),
+            .groups = "drop") %>%
+  mutate(pop = case_when(as.numeric(substr(grid,1,2)) < 40 ~ "MAB",
+                         TRUE ~ "GB")) %>%
+  ggplot() +
+  geom_line(aes(x = as.numeric(year), y = log10(mean_n), 
+                color = lat, group = grid)) +
+  facet_grid(rows = vars(pop), cols = vars(sizecat)) +
+  viridis::scale_color_viridis() +
+  labs(x = "") +
+  theme_bw() +
+  theme(text = element_text(size = 13)) +
+  scale_x_continuous(breaks = c(1980, 2000, 2019),
+                     labels = c(1980, 2000, 2019))
+
+ggsave("figures/scallop_grid_1d_mean_n_by_year2.png",
+       height = 5, width = 7, dpi = 400)
 ```
 
