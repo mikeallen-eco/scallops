@@ -15,22 +15,27 @@ is.odd <- function(x) x %% 2 != 0
 # read in data (and describe in comments)
 
 # metadata on the different cruises
-cruise_details <- read.csv("data/noaa/22564_MASTER_CRUISE_DETAILS.csv")
+cruise_details <- 
+  read.csv("data_noaa/dredge/22564_MASTER_CRUISE_DETAILS.csv")
 
-# metadata on the types of data collected on cruises?
-cruise_tab <- read.csv("data/noaa/22564_MASTER_CRUISE_TABLE.csv")
+# metadata on the types of data collected on cruises
+cruise_tab <- 
+  read.csv("data_noaa/dredge/22564_MASTER_CRUISE_TABLE.csv")
 
-# more info on the cruises (fewer; just those that did scallop survey?)
-svdbs_cruises <- read.csv("data/noaa/22564_SVDBS_CRUISES.csv")
+# more info on the cruises
+svdbs_cruises <- 
+  read.csv("data_noaa/dredge/22564_SVDBS_CRUISES.csv")
 
 # scallop  data by individual from each tow 
 # (including length, sex, mass, maturity, stomach volume/weight, some age)
 # missing data from 1980-2004
-svbio <- read.csv("data/noaa/22564_UNION_FSCS_SVBIO.csv") %>%
+svbio <- 
+  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVBIO.csv") %>%
   filter(SVSPP == 401)# 26490 rows before spp filtering
 
 # scallop number and total weight caught per tow
-svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv") %>%
+svcat <- 
+  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVCAT.csv") %>%
   filter(SVSPP == 401)
 
 # full scallop data aggregated by length measurements
@@ -38,38 +43,49 @@ svcat <- read.csv("data/noaa/22564_UNION_FSCS_SVCAT.csv") %>%
 # way more records (>500k) than svbio or svcat
 # data field descriptions here: https://www.fisheries.noaa.gov/inport/item/33729/printable-form
 # 
-svlen <- read.csv("data/noaa/22564_UNION_FSCS_SVLEN.csv") %>%
+svlen <- 
+  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVLEN.csv") %>%
   filter(SVSPP == 401)
 
 # cruise/tow/station location and depth info
-svsta <- read.csv("data/noaa/22564_UNION_FSCS_SVSTA.csv")
+svsta <- 
+  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVSTA.csv")
 
 # cloud cover code lookup
-svdbs_cloud <- read.csv("data/noaa/SVDBS_CLOUD.csv")
+svdbs_cloud <- 
+  read.csv("data_noaa/dredge/SVDBS_CLOUD.csv")
 
 # maturity code lookup
-svdbs_mat_codes <- read.csv("data/noaa/SVDBS_MATURITY_CODES.csv")
+svdbs_mat_codes <- 
+  read.csv("data_noaa/dredge/SVDBS_MATURITY_CODES.csv")
 
 # sex code lookup
-svdbs_sex_codes <- read.csv("data/noaa/SVDBS_SEX_CODES.csv")
+svdbs_sex_codes <- 
+  read.csv("data_noaa/dredge/SVDBS_SEX_CODES.csv")
 
 # gear code lookup (detailed info on what gear was used)
-svdbs_gear <- read.csv("data/noaa/SVDBS_SVGEAR.csv")
+svdbs_gear <- 
+  read.csv("data_noaa/dredge/SVDBS_SVGEAR.csv")
 
 # strata code lookup with area, mid-pt coords, name, etc.
-svdbs_mstrata <- read.csv("data/noaa/SVDBS_SVMSTRATA.csv")
+svdbs_mstrata <- 
+  read.csv("data_noaa/dredge/SVDBS_SVMSTRATA.csv")
 
 # species code lookup
-svdbs_species <- read.csv("data/noaa/SVDBS_SVSPECIES_LIST.csv")
+svdbs_species <- 
+  read.csv("data_noaa/dredge/SVDBS_SVSPECIES_LIST.csv")
 
 # vessel abbreviation lookup
-svdbs_vessel <- read.csv("data/noaa/SVDBS_SVVESSEL.csv")
+svdbs_vessel <- 
+  read.csv("data_noaa/dredge/SVDBS_SVVESSEL.csv")
 
 # weather code lookup
-svdbs_weather <- read.csv("data/noaa/SVDBS_WEATHER.csv")
+svdbs_weather <- 
+  read.csv("data_noaa/dredge/SVDBS_WEATHER.csv")
 
 # temperature data device lookup (analog, hydrolab, seabird, etc.)
-svdbs_xbt <- read.csv("data/noaa/SVDBS_XBT.csv")
+svdbs_xbt <- 
+  read.csv("data_noaa/dredge/SVDBS_XBT.csv")
 
 # summarizing data for the SVLEN data set
 svlen_sum_temp = svlen %>%
