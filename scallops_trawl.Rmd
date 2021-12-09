@@ -18,12 +18,13 @@ dat <- readRDS("data_noaa/trawl/dat.rds") %>%
   filter(grepl(sppocean, pattern = "placopecten"))
 
 # read in haul data
-# subset hauls to only include regions with Placopecten magellanicus
-# plus SCDNR_SEUS as it is embedded within
+# subset hauls to only include NEFSC_NEUS which has length
+# other surveys with scallops:
+# "DFO_ScotianShelf", "VIMS_NEAMAP", "DFO_Newfoundland" 
+# "SCDNR_SEUS" is embedded within, but has no scallops
 hauls <- readRDS("data_noaa/trawl/hauls.rds") %>%
-  filter(region %in% c("NEFSC_NEUS", "DFO_ScotianShelf",
-                       "VIMS_NEAMAP", "DFO_Newfoundland",
-                       "SCDNR_SEUS")) %>%
+  filter(region %in% c("NEFSC_NEUS", "SCDNR_SEUS",
+                       "VIMS_NEAMAP","DFO_ScotianShelf")) %>%
   # fill all haul data with scallop wtcpue
   left_join(dat, by = "haulid") %>%
   select(-sppocean, -Freq, -presfit, -logwtcpue) %>%
@@ -86,10 +87,10 @@ ggplot() +
   labs(x = "", y = "", fill = "log10(wt+1)") +
   facet_wrap(~decade)
 
-# ggsave("figures/scallop_trawl_hd_mean_catch_by_decade3.png",
-#        height = 3, width = 7, dpi = 400)
+ggsave("figures/scallop_trawl_hd_mean_catch_by_decade_fixed.png",
+       height = 3, width = 7, dpi = 400)
 ```
-# summarize # haul/yr by decade
+# summarize # hauls/yr by decade
 ```{r}
 hd_sf %>%
   group_by(grid, lat, lon, decade) %>%
@@ -183,7 +184,13 @@ ts2  %>%
   scale_x_continuous(breaks = c(1980, 2000, 2019),
                      labels = c(1980, 2000, 2019))
 
-ggsave("figures/scallop_trawl_hd_mean_catch_by_year.png",
+ggsave("figures/scallop_trawl_hd_mean_catch_by_year2.png",
        height = 5, width = 7, dpi = 400)
+```
+
+# adding in length data
+```{r}
+
+
 ```
 
