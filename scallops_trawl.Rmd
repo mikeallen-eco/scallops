@@ -13,245 +13,105 @@ library(rnaturalearth)
 library(here)
 is.odd <- function(x) x %% 2 != 0
 
-# read in data (and describe in comments)
+# read in scallop data 
+dat <- readRDS("data_noaa/trawl/dat.rds") %>%
+  filter(grepl(sppocean, pattern = "placopecten"))
 
-# metadata on the different cruises
-cruise_details <- 
-  read.csv("data_noaa/dredge/22564_MASTER_CRUISE_DETAILS.csv")
-
-# metadata on the types of data collected on cruises
-cruise_tab <- 
-  read.csv("data_noaa/dredge/22564_MASTER_CRUISE_TABLE.csv")
-
-# more info on the cruises
-svdbs_cruises <- 
-  read.csv("data_noaa/dredge/22564_SVDBS_CRUISES.csv")
-
-# scallop  data by individual from each tow 
-# (including length, sex, mass, maturity, stomach volume/weight, some age)
-# missing data from 1980-2004
-svbio <- 
-  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVBIO.csv") %>%
-  filter(SVSPP == 401)# 26490 rows before spp filtering
-
-# scallop number and total weight caught per tow
-svcat <- 
-  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVCAT.csv") %>%
-  filter(SVSPP == 401)
-
-# full scallop data aggregated by length measurements
-# EXPANDED.NUMBER.AT.LENGTH = # recorded with that length; 
-# way more records (>500k) than svbio or svcat
-# data field descriptions here: https://www.fisheries.noaa.gov/inport/item/33729/printable-form
-# 
-svlen <- 
-  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVLEN.csv") %>%
-  filter(SVSPP == 401)
-
-# cruise/tow/station location and depth info
-svsta <- 
-  read.csv("data_noaa/dredge/22564_UNION_FSCS_SVSTA.csv")
-
-# cloud cover code lookup
-svdbs_cloud <- 
-  read.csv("data_noaa/dredge/SVDBS_CLOUD.csv")
-
-# maturity code lookup
-svdbs_mat_codes <- 
-  read.csv("data_noaa/dredge/SVDBS_MATURITY_CODES.csv")
-
-# sex code lookup
-svdbs_sex_codes <- 
-  read.csv("data_noaa/dredge/SVDBS_SEX_CODES.csv")
-
-# gear code lookup (detailed info on what gear was used)
-svdbs_gear <- 
-  read.csv("data_noaa/dredge/SVDBS_SVGEAR.csv")
-
-# strata code lookup with area, mid-pt coords, name, etc.
-svdbs_mstrata <- 
-  read.csv("data_noaa/dredge/SVDBS_SVMSTRATA.csv")
-
-# species code lookup
-svdbs_species <- 
-  read.csv("data_noaa/dredge/SVDBS_SVSPECIES_LIST.csv")
-
-# vessel abbreviation lookup
-svdbs_vessel <- 
-  read.csv("data_noaa/dredge/SVDBS_SVVESSEL.csv")
-
-# weather code lookup
-svdbs_weather <- 
-  read.csv("data_noaa/dredge/SVDBS_WEATHER.csv")
-
-# temperature data device lookup (analog, hydrolab, seabird, etc.)
-svdbs_xbt <- 
-  read.csv("data_noaa/dredge/SVDBS_XBT.csv")
-
-# summarizing data for the SVLEN data set
-svlen_sum_temp = svlen %>%
-  mutate(
-    exp_num2 = tidyr::replace_na(EXPANDED.NUMBER.AT.LENGTH, 1),
-    sizecat = case_when(
-    LENGTH <= 6.5 ~ "< 65 mm",
-    LENGTH > 6.5 & LENGTH < 8.8 ~ "65-88 mm",
-    LENGTH >= 8.8 ~ "> 88 mm"
-  )) %>%
-  group_by(CRUISE6, STRATUM, TOW, STATION, sizecat) %>%
-  summarize(n = sum(EXPANDED.NUMBER.AT.LENGTH),
-            n2 = sum(exp_num2),
-            .groups = "drop") %>%
-  mutate(year = substr(CRUISE6, 1, 4))
-
-# all tow/size groups
-temp = svlen %>%
-  select(CRUISE6, STRATUM, TOW, STATION) %>%
-  distinct()
-
-sc <- temp %>%
-  bind_rows(temp) %>%
-  bind_rows(temp) %>%
-  mutate(year = substr(CRUISE6,1,4),
-         sizecat = c(rep("< 65 mm", 15447),
-           rep("65-88 mm", 15447),
-           rep("> 88 mm", 15447))) %>%
-  left_join(svlen_sum_temp, by = c("CRUISE6", "STRATUM", 
-                              "TOW", "STATION", 
-                              "sizecat", "year")) %>%
-  replace_na(replace = list(n = 0, n2 = 0)) %>%
-  # add in the depth and lat/long info
-  left_join(select(svsta, CRUISE6, STRATUM, TOW, STATION, 
-                   AVGDEPTH, DECDEG_BEGLAT, DECDEG_BEGLON),
-            by = c("CRUISE6", "STRATUM", "TOW", "STATION")) %>%
-  mutate(lat = DECDEG_BEGLAT,
-         lon = DECDEG_BEGLON,
-         order = case_when(sizecat == "< 65 mm" ~ 1,
-                           sizecat == "65-88 mm" ~ 2,
-                           sizecat == "> 88 mm" ~ 3)) %>%
-  mutate(sizecat = forcats::fct_reorder(sizecat, order)) %>%
-  select(-order) %>%
-  filter(year>=1980) %>%
+# read in haul data
+# subset hauls to only include regions with Placopecten magellanicus
+# plus SCDNR_SEUS as it is embedded within
+hauls <- readRDS("data_noaa/trawl/hauls.rds") %>%
+  filter(region %in% c("NEFSC_NEUS", "DFO_ScotianShelf",
+                       "VIMS_NEAMAP", "DFO_Newfoundland",
+                       "SCDNR_SEUS")) %>%
+  # fill all haul data with scallop wtcpue
+  left_join(dat, by = "haulid") %>%
+  select(-sppocean, -Freq, -presfit, -logwtcpue) %>%
+  replace_na(list(wtcpue = 0)) %>%
   mutate(decade = case_when(year<1990 ~ "1980s", 
                             year>=1990 & year <2000 ~ "1990s",
                             year>=2000 ~ "2000s-2010s"),
-         grid_lat = trunc(lat)+0.5,
-         grid_lon = trunc(lon)-0.5,
+         grid_lat = case_when(lat-trunc(lat)<0.5 ~ trunc(lat)+0.25,
+                              lat-trunc(lat)>=0.5 ~ 
+                                trunc(lat)+0.75),
+         grid_lon = case_when(abs(lon-trunc(lon))<0.5 ~ 
+                                trunc(lon)-0.25,
+                              abs(lon-trunc(lon))>=0.5 ~ 
+                                trunc(lon)-0.75),
          grid = paste0(grid_lat,grid_lon))
-rm(svlen_sum_temp, temp)
 
-# summarize mean scallop abundance by 1x1 grid cells
-sc1d <- sc %>%
-  mutate(lat = grid_lat,
+
+# summarizing hauls data by 0.5 degree grid cell
+hd = hauls %>%
+    mutate(lat = grid_lat,
          lon = grid_lon) %>%
-  group_by(grid, year, decade, lat, lon, 
-           grid_lat, grid_lon, sizecat) %>%
-  summarize(mean_n = mean(n),
-            n_tows = length(n),
-            mean_depth = mean(AVGDEPTH),
+    group_by(grid, year, decade, lat, lon, 
+           grid_lat, grid_lon) %>%
+  summarize(mean_wtcpue = mean(wtcpue),
+            n_hauls = length(wtcpue),
+            mean_depth = mean(elev),
+            mean_bottemp = mean(bottemp),
             .groups = "drop") %>%
   arrange(grid, year)
 
 # load spatial data
-sc_sf <- sc %>%
+hauls_sf <- hauls %>%
   st_as_sf(coords = c("lon", "lat"),
            crs = 4326)
 
-sc1d_sf <- sc1d %>%
+hd_sf <- hd %>%
   st_as_sf(coords = c("grid_lon", "grid_lat"),
            crs = 4326)
 
-state_bounds <- ne_coastline(scale = 110, returnclass = "sf") %>%
-  st_crop(svlen_sum_sf)
+state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(hd_sf)
 ```
-# Plot tows
+# Plot 0.5 x 0.5 degree grid cell averages - mean catch by decade
 ```{r}
-# plot scallop abundance by size and decade
-sc_sf %>%
-ggplot() +
-  geom_sf(data = state_bounds, aes(), color = "gray",
-          size = .25) +
-  geom_sf(aes(color = log10(n+1)), alpha = 0.3, size = 0.25) +
-  theme_bw() +
-  theme(text = element_text(size = 15),
-        axis.text = element_text(size = 8)) +
-  viridis::scale_color_viridis(option = "inferno") +
-  facet_grid(rows = vars(decade), cols = vars(sizecat))
-
-# ggsave("figures/scallop_maps12.png", 
-#        height = 7, width = 7, dpi = 800)
-```
-
-# Plot no. tows per year
-```{r}
-# ~ 100 - 500 tows / year, 1977-2019
-as.data.frame(table(svlen_sum$year)) %>%
-ggplot(aes(Var1, Freq, group = 1)) + 
-  geom_point() + 
-  geom_line() +
-  scale_x_discrete(breaks = seq(1980,2020, by = 5)) +
-  labs(x = "", y = "Tows / year") +
-  theme_bw()+
-  theme(text = element_text(size = 14))
-```
-# plot mean n per tow per year for each size class
-```{r}
-svlen_sum_size %>%
-  group_by(year, sizecat) %>%
-  summarize(mean_n = mean(n),
-            .groups = "drop") %>%
-  ggplot() +
-  geom_line(aes(x = as.numeric(year), 
-                y = mean_n, 
-               color = sizecat),
-            size = 1) +
-  scale_color_manual(values = 
-                       wesanderson::wes_palette(
-                         name = "Darjeeling1")) +
-  labs(x = "", y = "Mean no. per tow", color = "Size") +
-  theme_bw() +
-  theme(text = element_text(size = 15))
-
-ggsave("figures/mean_n_by_size_category2.jpg",
-       height = 4, width = 6, dpi = 400)
-
-```
-# Plot length by age
-From svbio database
-```{r}
-svbio %>%
-  ggplot() +
-  geom_boxplot(aes(x = as.factor(AGE), y = LENGTH*10)) +
-  theme_bw() +
-  theme(text = element_text(size = 15)) +
-  labs(x = "Age (years)", y = "Length (mm)")
-# ggsave("figures/length_by_age.jpg", 
-#        height = 4, width = 6, dpi = 400)
-```
-# Plot 1x1 degree grid cell averages
-```{r}
-# summarize # tows by decade
-sc1d_sf %>%
+# summarize mean catch by decade
+hd_sf %>%
   group_by(grid, lat, lon, decade) %>%
-  summarize(mean_tows = mean(n_tows),
+  summarize(mean_catch = mean(mean_wtcpue),
             .groups = "drop") %>%
 ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = mean_tows), 
+  geom_tile(aes(x = lon, y = lat, fill = log10(mean_catch+1)), 
+            alpha = 1, size = 0.25) +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_fill_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "log10(wt+1)") +
+  facet_wrap(~decade)
+
+# ggsave("figures/scallop_trawl_hd_mean_catch_by_decade3.png",
+#        height = 3, width = 7, dpi = 400)
+```
+# summarize # haul/yr by decade
+```{r}
+hd_sf %>%
+  group_by(grid, lat, lon, decade) %>%
+  summarize(mean_hauls = mean(n_hauls),
+            .groups = "drop") %>%
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_hauls), 
             alpha = 1, size = 0.25) +
   geom_sf(data = state_bounds, aes(), color = "gray",
           size = .25) +  theme_bw() +
   theme(text = element_text(size = 15),
         axis.text = element_text(size = 8)) +
   viridis::scale_fill_viridis(option = "inferno") +
-  labs(x = "", y = "") +
+  labs(x = "", y = "", fill = "hauls/yr") +
   facet_wrap(~decade)
 
-ggsave("figures/scallop_grid_1d_tows_by_decade.png",
-       height = 3, width = 7, dpi = 400)
-
+# ggsave("figures/scallop_trawl_hd_hauls_by_decade.png",
+#        height = 3, width = 7, dpi = 400)
 ```
-```{r}
 # summarize mean depth by cell
-sc1d_sf %>%
+```{r}
+hd_sf %>%
   group_by(grid, lat, lon) %>%
   summarize(mean_depth = mean(mean_depth),
             .groups = "drop") %>%
@@ -265,56 +125,56 @@ ggplot() +
   viridis::scale_fill_viridis(option = "inferno") +
   labs(x = "", y = "")
 
-
-ggsave("figures/scallop_grid_1d_mean_depth.png",
-       height = 7, width = 7, dpi = 400)
-
+# ggsave("figures/scallop_trawl_hd_mean_depth.png",
+#        height = 7, width = 7, dpi = 400)
 ```
+# summarize mean bottom temperature by cell
 ```{r}
-# summarize mean catch by decade
-sc1d_sf %>%
-  group_by(grid, lat, lon, sizecat, decade) %>%
-  summarize(mean_catch = mean(mean_n),
+hd_sf %>%
+  group_by(grid, lat, lon) %>%
+  summarize(mean_bottemp = mean(mean_bottemp, na.rm = T),
             .groups = "drop") %>%
 ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = log10(mean_catch+1)), 
+  geom_tile(aes(x = lon, y = lat, fill = mean_bottemp), 
             alpha = 1, size = 0.25) +
   geom_sf(data = state_bounds, aes(), color = "gray",
           size = .25) +  theme_bw() +
   theme(text = element_text(size = 15),
         axis.text = element_text(size = 8)) +
   viridis::scale_fill_viridis(option = "inferno") +
-  labs(x = "", y = "", fill = "log10(n+1)") +
-  facet_grid(rows = vars(decade), cols = vars(sizecat))
+  labs(x = "", y = "")
 
-ggsave("figures/scallop_grid_1d_mean_catch_by_decade.png",
-       height = 7, width = 7, dpi = 400)
+# ggsave("figures/scallop_trawl_hd_mean_bottemp.png",
+#        height = 7, width = 7, dpi = 400)
+
 ```
-
-
 # plot time series for cells with > 10 tows / year (average)
 ```{r}
-ts_plot_data <- sc1d_sf %>%
-  group_by(grid, sizecat, decade) %>%
-  mutate(mean_tows = mean(n_tows)) %>%
-  group_by(grid, sizecat) %>%
-  mutate(n_years = length(n_tows)) %>%
-  filter(mean_tows >= 10,
-         n_years > 2,
-         n_tows > 5)
+ts_plot_data <- hd_sf %>%
+  group_by(grid) %>%
+  mutate(mean_hauls = mean(n_hauls),
+         n_years = length(n_hauls),
+         frac_zeros = sum(mean_wtcpue==0)/n_years) %>%
+  filter(mean_hauls >= 1,
+         n_years > 10,
+         n_hauls > 0,
+         frac_zeros < 0.5)
 
-length(unique(ts_plot_data$grid))
+ts2 <- ts_plot_data %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  group_by(grid, lat, year) %>%
+  summarize(mean_wtcpue = mean(mean_wtcpue),
+            .groups = "drop")%>%
+  mutate(pop = case_when(lat < 40 ~ "< 40 deg",
+                         lat >= 40 & lat < 42 ~ "40-42 deg",
+                         TRUE ~ "> 42 deg"))
 
-ts_plot_data %>%
-  group_by(grid, lat, sizecat, year) %>%
-  summarize(mean_n = mean(mean_n),
-            .groups = "drop") %>%
-  mutate(pop = case_when(as.numeric(substr(grid,1,2)) < 40 ~ "MAB",
-                         TRUE ~ "GB")) %>%
+ts2  %>%
   ggplot() +
-  geom_line(aes(x = as.numeric(year), y = log10(mean_n), 
+  geom_line(aes(x = as.numeric(year), y = log10(mean_wtcpue+1), 
                 color = lat, group = grid)) +
-  facet_grid(rows = vars(pop), cols = vars(sizecat)) +
+  facet_wrap(~pop) +
   viridis::scale_color_viridis() +
   labs(x = "") +
   theme_bw() +
@@ -322,7 +182,7 @@ ts_plot_data %>%
   scale_x_continuous(breaks = c(1980, 2000, 2019),
                      labels = c(1980, 2000, 2019))
 
-ggsave("figures/scallop_grid_1d_mean_n_by_year2.png",
+ggsave("figures/scallop_trawl_hd_mean_catch_by_year.png",
        height = 5, width = 7, dpi = 400)
 ```
 
