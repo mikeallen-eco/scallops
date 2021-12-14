@@ -1,5 +1,5 @@
 ---
-title: "scallops"
+title: "scallops - trawl data set"
 author: "Mike Allen"
 date: "10/29/2021"
 output: html_document
@@ -13,18 +13,17 @@ library(rnaturalearth)
 library(here)
 is.odd <- function(x) x %% 2 != 0
 
-# read in scallop data 
+# read in trawl data, filter to just scallops (sent by Fred K)
 dat <- readRDS("data_noaa/trawl/dat.rds") %>%
   filter(grepl(sppocean, pattern = "placopecten"))
 
-# read in haul data
+# read in haul data (sent by Fred K)
 # subset hauls to only include NEFSC_NEUS which has length
 # other surveys with scallops:
 # "DFO_ScotianShelf", "VIMS_NEAMAP", "DFO_Newfoundland" 
 # "SCDNR_SEUS" is embedded within, but has no scallops
-hauls <- readRDS("data_noaa/trawl/hauls.rds") %>%
-  filter(region %in% c("NEFSC_NEUS", "SCDNR_SEUS",
-                       "VIMS_NEAMAP","DFO_ScotianShelf")) %>%
+hauls_df_step1 <- readRDS("data_noaa/trawl/hauls.rds") %>%
+  filter(region %in% c("NEFSC_NEUS")) %>%
   # fill all haul data with scallop wtcpue
   left_join(dat, by = "haulid") %>%
   select(-sppocean, -Freq, -presfit, -logwtcpue) %>%
@@ -39,38 +38,124 @@ hauls <- readRDS("data_noaa/trawl/hauls.rds") %>%
                                 trunc(lon)-0.25,
                               abs(lon-trunc(lon))>=0.5 ~ 
                                 trunc(lon)-0.75),
-         grid = paste0(grid_lat,grid_lon))
+         grid = paste0(grid_lat,grid_lon)) %>%
+  arrange(haulid, year)
 
+# Read in NEUS survey length data from OceanAdapt 
+# originally obtained from Alexa F as "neus_Survdat.RData"
+tlen <- readRDS("data_noaa/trawl/survdat.rds") %>%
+  # filter to just scallops (401)
+  filter(SVSPP == 401) %>%
+  # divide into length bins (measures coarser than dredge survey)
+  mutate(
+    sizecat = case_when(
+        LENGTH <= 6 ~ "< 70 mm",
+        LENGTH > 6 & LENGTH < 10 ~ "70-100 mm",
+        LENGTH >= 10 ~ "> 100 mm"),
+    plotorder = case_when(
+        LENGTH <= 6 ~ 1,
+        LENGTH > 6 & LENGTH < 10 ~ 2,
+        LENGTH >= 10 ~ 3),
+    n_0_70 = ifelse(LENGTH <= 6, NUMLEN, 0),
+    n_70_100 = ifelse(LENGTH > 6 & LENGTH < 10, NUMLEN, 0),
+    n_100_up = ifelse(LENGTH >= 10, NUMLEN, 0),
+    station_temp = case_when(nchar(STATION)==1 ~ 
+                               paste0("00", as.character(STATION)),
+                             nchar(STATION)==2 ~
+                               paste0("0", as.character(STATION)),
+                             nchar(STATION)==3 ~
+                               as.character(STATION),
+                             TRUE ~ "problem"),
+    haulid = paste(CRUISE6,station_temp,STRATUM, sep = "-")) %>%
+  select(-station_temp)
+
+# include total catch number from tlen in hauls_df
+hauls_df_step2 <- tlen %>%
+  group_by(haulid) %>%
+  summarize(n_catch = sum(NUMLEN, na.rm = T), # 23 NAs most in 1963
+            .groups = "drop") %>%
+  right_join(hauls_df_step1, by = "haulid") %>%
+  replace_na(replace = list(n_catch = 0)) %>%
+  arrange(haulid, year)
+#note: haulid "201404-211-1100" has EXTREMELY high count (>150k)
+
+hauls_df <- hauls_df_step2 %>%
+  bind_rows(hauls_df_step2) %>%
+  bind_rows(hauls_df_step2) %>%
+  mutate(sizecat = c(rep("< 70 mm", nrow(hauls_df_step2)),
+                     rep("70-100 mm", nrow(hauls_df_step2)),
+                     rep("> 100 mm", nrow(hauls_df_step2))),
+         plotorder = c(rep(1, nrow(hauls_df_step2)),
+                     rep(2, nrow(hauls_df_step2)),
+                     rep(3, nrow(hauls_df_step2)))) %>%
+  arrange(grid, year, sizecat)
+
+#NOTE NOTE:; NEXT NEED TO RBIND 3 COPIES TOGETHER AND JOIN WITH TLEN BASED ON HAULID AND SIZECAT
+
+rm(hauls_df_step1)
 
 # summarizing hauls data by 0.5 degree grid cell
-hd = hauls %>%
+hd_df_step1 = hauls_df %>%
     mutate(lat = grid_lat,
          lon = grid_lon) %>%
     group_by(grid, year, decade, lat, lon, 
            grid_lat, grid_lon) %>%
   summarize(mean_wtcpue = mean(wtcpue),
+            mean_tot_num = mean(n_catch),
             n_hauls = length(wtcpue),
             mean_depth = mean(elev),
             mean_bottemp = mean(bottemp),
             .groups = "drop") %>%
-  arrange(grid, year)
+  arrange(grid, year) %>%
+  filter(lat >34)
+
+# THIS ONE IS OBSOLETE IF THE APPROACH ABOVE WORKS
+# create version with duplicate row for each length class
+# (to allow merging with length data)
+hd_df_step2 <- hd_df_step1 %>%
+  bind_rows(hd_df_step1) %>%
+  bind_rows(hd_df_step1) %>%
+  mutate(sizecat = c(rep("< 70 mm", nrow(hd_df_step1)),
+                     rep("70-100 mm", nrow(hd_df_step1)),
+                     rep("> 100 mm", nrow(hd_df_step1))),
+         plotorder = c(rep(1, nrow(hd_df_step1)),
+                     rep(2, nrow(hd_df_step1)),
+                     rep(3, nrow(hd_df_step1)))) %>%
+  arrange(grid, year, sizecat)
+
+# THIS TOO
+# summarize # scallops caught by length class & grid cell
+tlen_hd_df <- tlen %>%
+    mutate(decade = case_when(year<1990 ~ "1980s", 
+                            year>=1990 & year <2000 ~ "1990s",
+                            year>=2000 ~ "2000s-2010s"),
+         grid_lat = case_when(lat-trunc(lat)<0.5 ~ trunc(lat)+0.25,
+                              lat-trunc(lat)>=0.5 ~ 
+                                trunc(lat)+0.75),
+         grid_lon = case_when(abs(lon-trunc(lon))<0.5 ~ 
+                                trunc(lon)-0.25,
+                              abs(lon-trunc(lon))>=0.5 ~ 
+                                trunc(lon)-0.75),
+         grid = paste0(grid_lat,grid_lon)) %>%
 
 # load spatial data
-hauls_sf <- hauls %>%
+hauls <- hauls_df %>%
   st_as_sf(coords = c("lon", "lat"),
            crs = 4326)
 
-hd_sf <- hd %>%
+hd <- hd_df %>%
   st_as_sf(coords = c("grid_lon", "grid_lat"),
            crs = 4326)
 
 state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
-  st_crop(hd_sf)
+  st_crop(hd)
+
+rm(hauls_df, hd_df, dat)
 ```
 # Plot 0.5 x 0.5 degree grid cell averages - mean catch by decade
 ```{r}
 # summarize mean catch by decade
-hd_sf %>%
+hd %>%
   group_by(grid, lat, lon, decade) %>%
   summarize(mean_catch = mean(mean_wtcpue),
             .groups = "drop") %>%
@@ -87,32 +172,12 @@ ggplot() +
   labs(x = "", y = "", fill = "log10(wt+1)") +
   facet_wrap(~decade)
 
-ggsave("figures/scallop_trawl_hd_mean_catch_by_decade_fixed.png",
-       height = 3, width = 7, dpi = 400)
-```
-# summarize # hauls/yr by decade
-```{r}
-hd_sf %>%
-  group_by(grid, lat, lon, decade) %>%
-  summarize(mean_hauls = mean(n_hauls),
-            .groups = "drop") %>%
-ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = mean_hauls), 
-            alpha = 1, size = 0.25) +
-  geom_sf(data = state_bounds, aes(), color = "gray",
-          size = .25) +  theme_bw() +
-  theme(text = element_text(size = 15),
-        axis.text = element_text(size = 8)) +
-  viridis::scale_fill_viridis(option = "inferno") +
-  labs(x = "", y = "", fill = "hauls/yr") +
-  facet_wrap(~decade)
-
-# ggsave("figures/scallop_trawl_hd_hauls_by_decade.png",
-#        height = 3, width = 7, dpi = 400)
+ggsave("figures/scallop_trawl_hd_mean_catch_by_decade_NEUSonly.png",
+        height = 3, width = 7, dpi = 400)
 ```
 # summarize mean depth by cell
 ```{r}
-hd_sf %>%
+hd %>%
   group_by(grid, lat, lon) %>%
   summarize(mean_depth = mean(mean_depth),
             .groups = "drop") %>%
@@ -131,7 +196,7 @@ ggplot() +
 ```
 # summarize mean bottom temperature by cell
 ```{r}
-hd_sf %>%
+hd %>%
   group_by(grid, lat, lon) %>%
   summarize(mean_bottemp = mean(mean_bottemp, na.rm = T),
             .groups = "drop") %>%
@@ -184,12 +249,108 @@ ts2  %>%
   scale_x_continuous(breaks = c(1980, 2000, 2019),
                      labels = c(1980, 2000, 2019))
 
-ggsave("figures/scallop_trawl_hd_mean_catch_by_year2.png",
-       height = 5, width = 7, dpi = 400)
+# ggsave("figures/scallop_trawl_hd_mean_catch_by_year2.png",
+#        height = 5, width = 7, dpi = 400)
 ```
 
 # adding in length data
 ```{r}
+# load NEUS surveys length data from OceanAdapt
+load("data_noaa/trawl/neus_Survdat.RData")
+tlen <- survdat %>%
+  # filter to just scallops (401)
+  filter(SVSPP == 401) %>%
+  # divide into length bins (measures coarser than dredge survey)
+  mutate(
+    sizecat = case_when(
+        LENGTH <= 6 ~ "< 70 mm",
+        LENGTH > 6 & LENGTH < 10 ~ "70-100 mm",
+        LENGTH >= 10 ~ "> 100 mm"),
+    station_temp = case_when(nchar(STATION)==1 ~ 
+                               paste0("00", as.character(STATION)),
+                             nchar(STATION)==2 ~
+                               paste0("0", as.character(STATION)),
+                             nchar(STATION)==3 ~
+                               as.character(STATION),
+                             TRUE ~ "problem"),
+    haulid = paste(CRUISE6,station_temp,STRATUM, sep = "-")) %>%
+  select(-station_temp)
+
+# how well does tlen density match hauls_df density?
+tlen_haul_tot <- tlen %>%
+  group_by(haulid) %>%
+  summarize(n_catch = sum(NUMLEN),
+            .groups = "drop") %>%
+  right_join(hauls_df) 
+#note: haulid "201404-211-1100" has EXTREMELY high count
+
+plot(log10(tlen_haul_tot$n_catch+1) ~ log10(tlen_haul_tot$wtcpue+1))
+
+# compare by grid cell
+
+# how many NA lengths?
+sum(is.na(survdat$LENGTH)) # 17 in 1963, 1 each in 81,92,93,01,09,10
+
+# how many hauls in the OceanAdapt and tlen data?
+length(unique(hauls_df$haulid)) # 33775
+length(unique(hauls_df[hauls_df$wtcpue>0,]$haulid)) # 7149 > 0 wt
+length(unique(tlen$haulid)) # 8140 (goes to 2019; hauls to 2015)
+
+# how many tlen ids match up with haulids?
+test = hauls_df %>%
+  filter(haulid %in% unique(tlen$haulid))
+nrow(test) # 7122 (99.6%) of the 7149 with >0 wt have length info
+rm(test)
+
+# create vall haulid/size groups
+temp = hauls_df %>%
+  select(CRUISE6, STRATUM, TOW, STATION) %>%
+  distinct()
+
+sc <- temp %>%
+  bind_rows(temp) %>%
+  bind_rows(temp) %>%
+  mutate(year = substr(CRUISE6,1,4),
+         sizecat = c(rep("< 65 mm", 15447),
+           rep("65-88 mm", 15447),
+           rep("> 88 mm", 15447))) %>%
+  left_join(svlen_sum_temp, by = c("CRUISE6", "STRATUM", 
+                              "TOW", "STATION", 
+                              "sizecat", "year")) %>%
+  replace_na(replace = list(n = 0, n2 = 0)) %>%
+  # add in the depth and lat/long info
+  left_join(select(svsta, CRUISE6, STRATUM, TOW, STATION, 
+                   AVGDEPTH, DECDEG_BEGLAT, DECDEG_BEGLON),
+            by = c("CRUISE6", "STRATUM", "TOW", "STATION")) %>%
+  mutate(lat = DECDEG_BEGLAT,
+         lon = DECDEG_BEGLON,
+         order = case_when(sizecat == "< 65 mm" ~ 1,
+                           sizecat == "65-88 mm" ~ 2,
+                           sizecat == "> 88 mm" ~ 3)) %>%
+  mutate(sizecat = forcats::fct_reorder(sizecat, order)) %>%
+  select(-order) %>%
+  filter(year>=1980) %>%
+  mutate(decade = case_when(year<1990 ~ "1980s", 
+                            year>=1990 & year <2000 ~ "1990s",
+                            year>=2000 ~ "2000s-2010s"),
+         grid_lat = trunc(lat)+0.5,
+         grid_lon = trunc(lon)-0.5,
+         grid = paste0(grid_lat,grid_lon))
+rm(svlen_sum_temp, temp)
+
+# summarize mean scallop abundance by 1x1 grid cells
+sc1d <- sc %>%
+  mutate(lat = grid_lat,
+         lon = grid_lon) %>%
+  group_by(grid, year, decade, lat, lon, 
+           grid_lat, grid_lon, sizecat) %>%
+  summarize(mean_n = mean(n),
+            n_tows = length(n),
+            mean_depth = mean(AVGDEPTH),
+            .groups = "drop") %>%
+  arrange(grid, year)
+
+
 
 
 ```
