@@ -92,8 +92,8 @@ svlen_sum_temp = svlen %>%
   mutate(
     exp_num2 = tidyr::replace_na(EXPANDED.NUMBER.AT.LENGTH, 1),
     sizecat = case_when(
-    LENGTH <= 6.5 ~ "< 65 mm",
-    LENGTH > 6.5 & LENGTH < 8.8 ~ "65-88 mm",
+    LENGTH < 6.5 ~ "< 65 mm",
+    LENGTH >= 6.5 & LENGTH < 8.8 ~ "65-88 mm",
     LENGTH >= 8.8 ~ "> 88 mm"
   )) %>%
   group_by(CRUISE6, STRATUM, TOW, STATION, sizecat) %>%
