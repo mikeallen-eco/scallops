@@ -137,6 +137,30 @@ state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
   st_crop(hd)
 
 rm(hauls_df, dat)
+
+# check DRM data has all haulids that are in OceanAdapt data
+# OA_fall <- readRDS(here("data_noaa/trawl/",
+#                           "dat_explodedNortheast US Fall.rds")) %>%
+#   filter(substr(haulid, 1, 4) %in% 1963:2015)
+# 
+# OA_spring <- readRDS(here("data_noaa/trawl/",
+#                         "dat_explodedNortheast US Spring.rds")) %>%
+#   filter(substr(haulid, 1, 4) %in% 1963:2015)
+# 
+# length(unique(OA_fall$haulid)) # 17923
+# length(unique(OA_spring$haulid)) # 16329  
+# # sum = 34252 or 477 more than the DRM data. Need to check.
+# length(unique(hauls_drm$haulid)) # 33775
+test = hauls_drm %>% group_by(haulid, year) %>% summarize(n = sum(number_at_length), .groups = "drop")
+
+test2 = table(test$year, test$n>0) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  rename(year = 1, pres = 2, Freq = 3) %>%
+  pivot_wider(id_cols = c(year), names_from = pres,
+              values_from = Freq) %>%
+  rename(year = 1, not_pres = 2, pres = 3) %>%
+  mutate(p = pres/(pres + not_pres))
 ```
 # Plot 0.5 x 0.5 degree grid cell averages - mean catch by decade
 ```{r}
@@ -160,6 +184,125 @@ ggplot() +
 
 # ggsave("figures/scallop_trawl_hd_mean_catch_by_decade.png",
 #         height = 3, width = 7, dpi = 400)
+```
+# Plot change in 0.5 grid cell average catch by time period
+"Because of these measures, the abundance of sea scallops
+recovered rapidly and was fully rebuilt by 2001 (Hart &
+Rago, 2006)." Zang 2022
+```{r}
+# summarize change in mean catch between 1980-1999 and 2000-2015
+change_plot = hd %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  filter(year >= 1980) %>%
+  mutate(decade = case_when(decade == "2000s-2010s" ~ 
+                              "Years_2000_2015",
+                            TRUE ~ "Years_1980_1999")) %>%
+  group_by(grid, lat, lon, decade) %>%
+  summarize(mean_catch = mean(mean_wtcpue, na.rm = T),
+            .groups = "drop") %>%
+  pivot_wider(id_cols = c(grid, lat, lon), names_from = decade,
+              values_from = "mean_catch") %>%
+  mutate(
+    pct_change = 
+           (100*Years_2000_2015 - Years_1980_1999)/Years_1980_1999,
+    change = Years_2000_2015 - Years_1980_1999,
+    grid_lat = lat, grid_lon = lon
+    ) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326) 
+
+ggplot() +
+  geom_point(aes(x = lon, y = lat, fill = change,
+                 size = Years_2000_2015), 
+            # alpha = 1,
+            data = change_plot,
+            shape = 21,
+            color = "black") +
+  geom_point(aes(x = lon, y = lat,
+                 size = Years_1980_1999), 
+            # alpha = 1,
+            data = change_plot,
+            shape = 1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Absolute\nchange",
+       size = "Mean CPUE\nin each\nperiod",
+       title = "Change in sea scallop catch,\ntrawl survey (1980-1999 vs. 2000-2015)")+ 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12))
+
+# ggsave("figures/scallop_trawl_hd_change_in_mean_catch.png",
+#         height = 5, width = 5, dpi = 400)
+```
+# Plot change in 0.5 grid cell average SBT by time period
+```{r}
+# summarize change in mean catch between 1980-1999 and 2000-2015
+change_sbt = hd %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  filter(year >= 1980) %>%
+  mutate(decade = case_when(decade == "2000s-2010s" ~ 
+                              "Years_2000_2015",
+                            TRUE ~ "Years_1980_1999")) %>%
+  group_by(grid, lat, lon, decade) %>%
+  summarize(mean_bottemp = mean(mean_bottemp, na.rm = T),
+            .groups = "drop") %>%
+  pivot_wider(id_cols = c(grid, lat, lon), names_from = decade,
+              values_from = "mean_bottemp") %>%
+  mutate(
+    change = Years_2000_2015 - Years_1980_1999,
+    pct_change = change/Years_1980_1999,
+    grid_lat = lat, grid_lon = lon
+    ) %>%
+  filter(change < 15) %>% # removes 1 very unusual coastal point
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326) 
+
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = change),
+            # alpha = 1,
+            data = change_sbt,
+            shape = 21,
+            color = "black") +
+  # geom_point(aes(x = lon, y = lat,
+  #                size = Years_1980_1999), 
+  #           # alpha = 1,
+  #           data = change_sbt,
+  #           shape = 1,
+  #           color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Absolute\nchange",
+       size = "Mean CPUE\nin each\nperiod",
+       title = "Change in sea bottom temp,\ntrawl survey (1980-1999 vs. 2000-2015)")+ 
+  # annotate("text", x = change_sbt$lon, y = change_sbt$lat, 
+  #          label = round(change_sbt$change,1),
+  #          size = 4) +
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12))
+
+ggsave("figures/scallop_trawl_hd_change_in_mean_catch.png",
+        height = 5, width = 5, dpi = 400)
 ```
 # summarize mean depth by cell
 ```{r}
