@@ -291,14 +291,13 @@ ggplot() +
   theme(text = element_text(size = 14),
         title = element_text(size = 12))
 
-rm(change_clim)
-ggsave("figures/scallop_grid_change_in_mean_sbt.png",
-        height = 5, width = 5, dpi = 400)
+# ggsave("figures/scallop_grid_change_in_mean_sbt.png",
+#         height = 5, width = 5, dpi = 400)
 ```
 # General climate data plotting
 ```{r}
 clim %>%
-  filter(grid %in% filter(change_clim, change < -.5)$grid) %>%
+  filter(grid %in% filter(change_clim, change < 10)$grid) %>%
 ggplot() + geom_line(aes(x = year, y = mean_temp, color = grid)) + guides(color = "none")
 
 ggplot(clim) + geom_line(aes(x = year, y = max_temp, color = grid)) + guides(color = "none")
