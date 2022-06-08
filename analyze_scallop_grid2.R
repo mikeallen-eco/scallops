@@ -44,11 +44,12 @@ custom_grid_vector = NULL # vector of grid names you want to include
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # CURRENTLY NOT REALLY WORKING
-T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
+T_dep_mortality = 1 # Alexa's note: CURRENTLY NOT REALLY WORKING
+T_dep_recruitment = 0 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
+btemp_meas <- "mean" # "min", "mean", or "max"
 
 if(time_varying_f==TRUE){
 # the f-at-age data starts in 1982; fill in the previous years with the earliest year of data
@@ -76,9 +77,26 @@ dat <- read_csv(here("processed-data","scallop_catch_at_length_mo.csv")) %>%
                                 trunc(lon)-0.75),
          grid = paste0(grid_lat, grid_lon)) %>%
   left_join(clim, by = c("grid", "grid_lat", "grid_lon",
-                         "year")) %>%
+                         "year"))
+
+# add the appropriate sbt measurement (min, mean, or max)
+if(btemp_meas == "mean"){
+dat <- dat %>%
   rename(btemp_old = btemp,
          btemp = mean_temp)
+}
+
+if(btemp_meas == "min"){
+dat <- dat %>%
+  rename(btemp_old = btemp,
+         btemp = min_temp)
+}
+
+if(btemp_meas == "max"){
+  dat <- dat %>%
+    rename(btemp_old = btemp,
+           btemp = max_temp)
+}
 
 # rename grid cells if cell size is set to 1x1 degree
 if(grid_1x1 == 1){
@@ -477,7 +495,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220418a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220608a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220414a.rds"))
 
 warmups <- 20000
