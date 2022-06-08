@@ -81,7 +81,6 @@ dat <- read_csv(here("processed-data","scallop_catch_at_length_mo.csv")) %>%
 
 # add the appropriate sbt measurement (min, mean, or max)
 if(btemp_meas == "mean"){
-<<<<<<< HEAD
 dat <- dat %>%
   rename(btemp_old = btemp,
          btemp = mean_temp)
@@ -91,17 +90,6 @@ if(btemp_meas == "min"){
 dat <- dat %>%
   rename(btemp_old = btemp,
          btemp = min_temp)
-=======
-  dat <- dat %>%
-    rename(btemp_old = btemp,
-           btemp = mean_temp)
-}
-
-if(btemp_meas == "min"){
-  dat <- dat %>%
-    rename(btemp_old = btemp,
-           btemp = min_temp)
->>>>>>> d61f4acf75ba106c457bb53000a8ddcfcada973f
 }
 
 if(btemp_meas == "max"){
