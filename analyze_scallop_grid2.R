@@ -44,11 +44,12 @@ custom_grid_vector = NULL # vector of grid names you want to include
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # CURRENTLY NOT REALLY WORKING
-T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
+T_dep_mortality = 1 # Alexa's note: CURRENTLY NOT REALLY WORKING
+T_dep_recruitment = 0 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
+btemp_meas <- "mean" # "min", "mean", or "max"
 
 if(time_varying_f==TRUE){
 # the f-at-age data starts in 1982; fill in the previous years with the earliest year of data
@@ -76,9 +77,26 @@ dat <- read_csv(here("processed-data","scallop_catch_at_length_mo.csv")) %>%
                                 trunc(lon)-0.75),
          grid = paste0(grid_lat, grid_lon)) %>%
   left_join(clim, by = c("grid", "grid_lat", "grid_lon",
-                         "year")) %>%
-  rename(btemp_old = btemp,
-         btemp = mean_temp)
+                         "year"))
+
+# add the appropriate sbt measurement (min, mean, or max)
+if(btemp_meas == "mean"){
+  dat <- dat %>%
+    rename(btemp_old = btemp,
+           btemp = mean_temp)
+}
+
+if(btemp_meas == "min"){
+  dat <- dat %>%
+    rename(btemp_old = btemp,
+           btemp = min_temp)
+}
+
+if(btemp_meas == "max"){
+  dat <- dat %>%
+    rename(btemp_old = btemp,
+           btemp = max_temp)
+}
 
 # rename grid cells if cell size is set to 1x1 degree
 if(grid_1x1 == 1){
@@ -232,8 +250,8 @@ patchdat <- dat %>%
   select(grid, grid_lat, grid_lon) %>%
   distinct() %>%
   filter(is.na(grid_lat)==FALSE) %>%
-  mutate(max_lon = grid_lon+0.25,
-         min_lon = grid_lon-0.25) %>% 
+  mutate(max_lon = grid_lon+0.5,
+         min_lon = grid_lon-0.5) %>% # these are +0.25 when using 1/2 degree cells 
   rowwise() %>% 
   mutate(lon_dist = distGeo(p1=c(max_lon, grid_lat), p2=c(min_lon, grid_lat))/1000, # get distance between the furthest longitudes in km, at the midpoint of the lat band 
          patch_area_km2 = lon_dist * 111) %>%  # 1 degree latitude = 111 km 
@@ -507,7 +525,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pme
 saveRDS(stan_model_fit, here("results","stan_model_fit_run20220426d.rds"))
 stan_model_fit <- readRDS(here("results","stan_model_fit_run20220426a.rds"))
 # library(shinystan)
-launch_shinystan(stan_model_fit)
+# launch_shinystan(stan_model_fit)
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
@@ -565,14 +583,13 @@ abund_p_y <- dat_train_dens %>%
   mutate(grid_lat = substr(grid, 1, 4),
          grid_lon = as.numeric(substr(grid, 5, 9))) # note: this is set up for 1x1 grid currently
   
-
 # grab subset of cells from MA_9 group
 # unique(abund_p_y$patch[abund_p_y$grid %in% MA_9$grid]) # c(25, 26, 30, 31, 32, 43, 44, 45)
 
 abund_p_y_hat <- tidybayes::spread_draws(stan_model_fit, dens_p_y_hat[patch,year]) %>%
   left_join(distinct(select(abund_p_y, grid, patch)))
 
-i = 14
+i = 18
 # look at raw density data for the patch if you want
 # test <- abund_p_y %>% 
 #   filter(grid %in% unique(abund_p_y_hat$grid)[i])
@@ -595,9 +612,30 @@ ggsave(plot = abundance_v_time, filename=here(plotsave,
                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
 
+# time series of predicted densities
+abund_p_y_hat %>%
+  group_by(year, grid, patch) %>%
+  summarise(dens_p_y_hat = mean(dens_p_y_hat)) %>%
+  ggplot() + 
+  geom_line(aes(x = year, y = dens_p_y_hat, color = grid))
+
+ggsave(filename=here(plotsave,
+                     "G_dens_p_y_hat_timeseries.png"), 
+       width=5, height=5, dpi = 200)
+
+# time series of measured densities
+abund_p_y %>%
+  # filter(year < 35) %>%
+  ggplot() + 
+  geom_line(aes(x = year, y = abundance, color = grid))
+
+ggsave(filename=here(plotsave,
+                     "G2_dens_p_y_timeseries.png"), 
+       width=5, height=5, dpi = 200)
+
 
 # NEW: map predicted densities
-i = 35
+i = 7
 for( i in 1:ny ) {
   print(i)
   year_filter <- unique(abund_p_y_hat$year)[i]
@@ -611,12 +649,12 @@ abund_p_y_hat %>%
     ggplot() + 
     geom_tile(aes(x = grid_lon, y = grid_lat, fill = dens_p_y_hat)) + 
     geom_point(data = filter(abund_p_y, year %in% year_filter), 
-               aes(x = grid_lon, y = grid_lat, color = log10(abundance+1)), 
+               aes(x = grid_lon, y = grid_lat, color = abundance), 
                pch = 16) +
-    labs(x="",y="") +
-  viridis::scale_fill_viridis()
+    labs(x="",y="", title = i) +
+  viridis::scale_fill_viridis() +
+  viridis::scale_color_viridis()
 
-  
   ggsave(filename=here(plotsave,
                                                 paste0("F2_dens_p_hat_map_year_",
                                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
@@ -627,7 +665,7 @@ abund_p_y_hat %>%
 # assess length comp fits
 
 n_p_l_y_hat <- tidybayes::gather_draws(stan_model_fit, n_p_l_y_hat[year,patch,length])
-saveRDS(n_p_l_y_hat, "results/n_p_l_y_hat_run20220413a.rds")
+saveRDS(n_p_l_y_hat, "results/n_p_l_y_hat_run20220426a.rds")
 
 n_p_l_y_hat <- readRDS("results/n_p_l_y_hat_run20220413a.rds")
 
@@ -642,6 +680,7 @@ dat_train_lengths <- dat_train_lengths %>%
 dat_train_lengths %>% 
   group_by(year,patch) %>% 
   summarise(n = sum(sum_num_at_length)) %>% 
+  # filter(year != 35) %>%
   ggplot(aes(year, n, color =factor(patch))) + 
   geom_point()
 ggsave(here(plotsave, "J_n_by_year_and_patch.png"))
@@ -849,7 +888,7 @@ est_patch_abund <- abund_p_y_hat %>%
   summarise(abundance = mean(dens_p_y_hat))
 
 observed_abundance_tile <- abund_p_y %>% 
-  # filter(abundance < 1000000) %>%
+  filter(abundance < 20000000) %>%
   ggplot(aes(x=year, y=patch, fill=abundance)) +
   geom_tile() +
   theme_bw() +
@@ -867,7 +906,7 @@ estimated_abundance_tile <- est_patch_abund %>%
   labs(title="Estimated", x="Year", y="Patch", fill="Abundance") +
   viridis::scale_fill_viridis()
 
-ggsave(observed_abundance_tile, filename=here(plotsave,"U_abundance_v_time_observed_tileplot_no_length_comps.png"))
+ggsave(observed_abundance_tile, filename=here(plotsave,"U_abundance_v_time_observed_tileplot_no_length_comps2.png"))
 ggsave(estimated_abundance_tile, filename=here(plotsave,"V_abundance_v_time_estimated_tileplot_no_length_comps.png"))
 
 # who's doing the colonizing?
