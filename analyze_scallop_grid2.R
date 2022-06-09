@@ -496,14 +496,14 @@ stan_data <- list(
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220608a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220414a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220608a.rds"))
 
-warmups <- 20000
-total_iterations <- 30000
+warmups <- 2000
+total_iterations <- 5000
 max_treedepth <-  10
 n_chains <-  1
 n_cores <- 1
-n_thin <- 40
+n_thin <- 8
 
 stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec.stan"), # check that it's the right model!
                        data = stan_data,
@@ -522,8 +522,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pme
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20220426d.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20220426a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20220608a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20220608a.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
 
