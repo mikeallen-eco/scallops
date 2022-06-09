@@ -20,12 +20,16 @@ library(ggridges)
 library(geosphere)
 library(ggridges)
 # library(Amelia) # seems to interfere with Stan
-plotsave <- "results/run20220426a"
-clim <- read.csv("processed-data/climate_formatted.csv")
 funs <- list.files("functions")
 sapply(funs, function(x) source(file.path("functions",x)))
 
 rstan_options(javascript=FALSE, auto_write =TRUE)
+
+# set the 
+plotsave <- "results/run20220609a"
+
+# read in climate data
+clim <- read.csv("processed-data/climate_formatted.csv")
 
 #############
 # make model decisions
@@ -49,7 +53,7 @@ T_dep_recruitment = 0 # think carefully before making more than one of the tempe
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
-btemp_meas <- "mean" # "min", "mean", or "max"
+btemp_meas <- "max" # "min", "mean", or "max"
 
 if(time_varying_f==TRUE){
 # the f-at-age data starts in 1982; fill in the previous years with the earliest year of data
@@ -206,7 +210,7 @@ dat_dens %>%
     geom_tile(aes(x = -grid_lon, y = grid_lat, fill = mean_dens)) +
   geom_text(aes(x = -grid_lon, y = grid_lat, label = patch), color = "white") +
   viridis::scale_fill_viridis()
- # ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
+  # ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
 
 # map where the NA values are
 dat_dens %>% 
@@ -495,8 +499,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220608a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220608a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220609a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220609a.rds"))
 
 warmups <- 2000
 total_iterations <- 5000
@@ -505,7 +509,7 @@ n_chains <-  1
 n_cores <- 1
 n_thin <- 8
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec.stan"), # check that it's the right model!
+stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec80.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -522,8 +526,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pme
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20220608a.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20220608a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20220609a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20220609a.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
 
@@ -537,23 +541,25 @@ quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.
 
 # Plot Topt/width posterior predictive distribution
 topt_plot = rstan::extract(stan_model_fit, c("Topt", "width"))
+
 topt_plot2 <- data.frame(
-  pd_med = dnorm(seq(-5, 25, by = .5), mean = median(topt_plot$Topt), sd = median(topt_plot$width)),
-  temp = seq(-5, 25, by = .5))
+  t_adjust = exp(-0.5 * ((seq(-10,35, by = .5) - median(topt_plot$Topt))/median(topt_plot$width))^2),
+  temp = seq(-10, 35, by = .5))
 
 topt_plot3_CI = lapply(1:250, function(x){
-  data.frame(pd = dnorm(seq(-5,25, by = .5), mean = topt_plot$Topt[x], sd = topt_plot$width[x]),
+  data.frame(temp = seq(-10,35, by = .5), 
+             topt = topt_plot$Topt[x], 
+             width = topt_plot$width[x],
              iter = x,
-             temp = seq(-5,25, by = .5))}) %>%
+             t_adjust = exp(-0.5 * ((seq(-10,35, by = .5) - topt_plot$Topt[x])/topt_plot$width[x])^2))}) %>%
   do.call(rbind, .)
 
-
 ggplot(topt_plot2) +
-  geom_line(aes(x = temp, y = pd, group = as.factor(iter)), 
+  geom_line(aes(x = temp, y = t_adjust, group = as.factor(iter)), 
             data = topt_plot3_CI,
             color = "firebrick",
             alpha = .1) +
-  geom_line(aes(x = temp, y = pd_med),
+  geom_line(aes(x = temp, y = t_adjust),
             size = 1) +
   theme_bw() +
   theme(text = element_text(size = 14)) +
@@ -660,10 +666,31 @@ abund_p_y_hat %>%
                                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
 
+# observed vs. predicted mean abundance
+abund_obs_pred <- abund_p_y_hat %>%
+  group_by(grid, year) %>%
+  summarise(dens_p_y_hat = mean(dens_p_y_hat),
+            .groups = "drop") %>%
+  left_join(abund_p_y, by = c("grid", "year"))
+corr <- cor.test(x=abund_obs_pred$abundance, y=abund_obs_pred$dens_p_y_hat, method = 'spearman')
 
+abund_obs_pred %>%
+  ggplot() +
+  geom_point(aes(x = abundance, y = dens_p_y_hat),
+             color = "firebrick", size = 3,
+             shape = 1, alpha = 0.75) +
+  annotate("text", x = max(abund_obs_pred$abundance,na.rm = T)-100, 
+           y = min(abund_obs_pred$dens_p_y_hat)+100, 
+           label = paste0("SRC = ", round(corr$estimate,3)), hjust = 1, vjust = 0) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "Observed abundance", y = "Predicted abundance")
+
+ggsave(paste0(plotsave, "/H_observed_vs_predicted.png"))
 
 # assess length comp fits
-
 n_p_l_y_hat <- tidybayes::gather_draws(stan_model_fit, n_p_l_y_hat[year,patch,length])
 saveRDS(n_p_l_y_hat, "results/n_p_l_y_hat_run20220426a.rds")
 
