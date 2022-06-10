@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20220609a"
+plotsave <- "results/run20220609b"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -53,7 +53,7 @@ T_dep_recruitment = 0 # think carefully before making more than one of the tempe
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
-btemp_meas <- "max" # "min", "mean", or "max"
+btemp_meas <- "mean" # "min", "mean", or "max"
 
 if(time_varying_f==TRUE){
 # the f-at-age data starts in 1982; fill in the previous years with the earliest year of data
@@ -499,8 +499,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220609a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220609a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220609b.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220609b.rds"))
 
 warmups <- 2000
 total_iterations <- 5000
@@ -526,8 +526,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pme
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20220609a.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20220609a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20220609b.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20220609b.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
 
