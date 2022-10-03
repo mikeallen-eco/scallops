@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20220610a"
+plotsave <- "results/run20221003a"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -34,12 +34,12 @@ clim <- read.csv("processed-data/climate_formatted.csv")
 #############
 # make model decisions
 #############
-train_years <- 1980:2014 # set training year range
-test_years <- 1980:2014 # set testing year range
+train_years <- 1980:2004 # set training year range
+test_years <- 2005:2014 # set testing year range
 season <- "fall" # "spring", "fall", or "both
 grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
-max_NA_dens <- 4 # set max number of NA dens values for each cell
-max_NA_sbt <- 4 # set max number of NA sbt values for each cell
+max_NA_dens <- 10 # set max number of NA dens values for each cell
+max_NA_sbt <- 10 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
