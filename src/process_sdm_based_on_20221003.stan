@@ -49,10 +49,14 @@ data {
   
   matrix[n_ages, n_lbins] l_at_a_key;
   
+  vector[n_lbins] selectivity_at_bin;
+  
   vector[n_ages] wt_at_age;
   
   real abund_p_y[np, ny_train]; // MEAN density of individuals of any age in each haul; used for rescaling the abundance to fit to our data
   
+  real abund_p_y_notNA[np, ny_train]; // used for skipping NAs in abund_p_y; matrix indicating whether abund_p_y is NA (1) or not (0)
+
   // environmental data 
   
   real sbt[np, ny_train]; // temperature data for training
@@ -83,6 +87,8 @@ data {
   
   int age_at_maturity;
   
+  int<lower = 0, upper = 1> manual_selectivity; // 0 or 1 indicating whether selectivity estimated or hard coded
+
   int<lower = 0, upper = 1> do_dirichlet;
   
   int<lower = 0, upper = 1> T_dep_recruitment;
@@ -93,9 +99,8 @@ data {
   
   int<lower = 0, upper = 1> spawner_recruit_relationship;
   
-    int<lower = 0, upper = 1> run_forecast;
+  int<lower = 0, upper = 1> run_forecast;
 
-  
   int n_p_l_y[np, n_lbins, ny_train]; // SUM number of individuals in each length bin, patch, and year; used for age composition only, because the magnitude is determined by sampling effort
   
   
@@ -156,8 +161,9 @@ parameters{
   
   real<lower = -1, upper = 1> alpha; // autocorrelation term
   
-  real  log_mean_recruits; // log mean recruits per patch, changed to one value for all space/time
-  
+  //real  log_mean_recruits; // log mean recruits per patch, changed to one value for all space/time
+  vector[np] log_mean_recruits; // patch-specific mean recruits
+
   vector[ny_train] raw; // array of raw recruitment deviates, changed to one value per year
   
   real<upper = 0.8> p_length_50_sel; // length at 50% selectivity
@@ -182,7 +188,8 @@ transformed parameters{
   
   real sel_delta;
   
-  real mean_recruits;
+  //real mean_recruits;
+  vector[np] mean_recruits;
   
   matrix<lower=0, upper=1> [np, ny_train] theta; // Bernoulli probability of encounter  
   
