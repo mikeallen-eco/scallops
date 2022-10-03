@@ -20,12 +20,16 @@ library(ggridges)
 library(geosphere)
 library(ggridges)
 # library(Amelia) # seems to interfere with Stan
-plotsave <- "results/run20220426a"
-clim <- read.csv("processed-data/climate_formatted.csv")
 funs <- list.files("functions")
 sapply(funs, function(x) source(file.path("functions",x)))
 
 rstan_options(javascript=FALSE, auto_write =TRUE)
+
+# set the 
+plotsave <- "results/run20220610a"
+
+# read in climate data
+clim <- read.csv("processed-data/climate_formatted.csv")
 
 #############
 # make model decisions
@@ -44,8 +48,8 @@ custom_grid_vector = NULL # vector of grid names you want to include
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 1 # Alexa's note: CURRENTLY NOT REALLY WORKING
-T_dep_recruitment = 0 # think carefully before making more than one of the temperature dependencies true
+T_dep_mortality = 0 # Alexa's note: CURRENTLY NOT REALLY WORKING
+T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
@@ -81,7 +85,6 @@ dat <- read_csv(here("processed-data","scallop_catch_at_length_mo.csv")) %>%
 
 # add the appropriate sbt measurement (min, mean, or max)
 if(btemp_meas == "mean"){
-<<<<<<< HEAD
 dat <- dat %>%
   rename(btemp_old = btemp,
          btemp = mean_temp)
@@ -91,17 +94,6 @@ if(btemp_meas == "min"){
 dat <- dat %>%
   rename(btemp_old = btemp,
          btemp = min_temp)
-=======
-  dat <- dat %>%
-    rename(btemp_old = btemp,
-           btemp = mean_temp)
-}
-
-if(btemp_meas == "min"){
-  dat <- dat %>%
-    rename(btemp_old = btemp,
-           btemp = min_temp)
->>>>>>> d61f4acf75ba106c457bb53000a8ddcfcada973f
 }
 
 if(btemp_meas == "max"){
@@ -188,8 +180,27 @@ dat_lengths <- dat %>%
             .groups = "drop") %>%
   filter(is.na(length) == FALSE)
 
+# prep dat length data excluding small scallops (< 80 mm)
+dat_lengths80 <- dat %>% 
+  filter(length >= 8) %>%
+  group_by(length, year, grid, patch) %>% 
+  summarise(sum_num_at_length = sum(number_at_length, na.rm = T),
+            .groups = "drop") %>%
+  filter(is.na(length) == FALSE)
+
 # prep dat dens data
 dat_dens <- dat %>% 
+  group_by(haulid, grid, patch, year, btemp) %>% 
+  summarise(dens = sum(number_at_length, na.rm = F)) %>% # get total no. scallops in each haul, of any size
+  group_by(year, grid, patch) %>% 
+  summarise(mean_dens = mean(dens, na.rm = T),
+            mean_sbt = mean(btemp, na.rm = T),
+            n_haul = sum(haulid!="temp"),
+            .groups = "drop") # get mean density (all sizes) / haul for the patch*year combo 
+
+# prep dat dens data, excluding smaller scallops (< 80 mm)
+dat_dens80 <- dat %>% 
+  filter(length >= 8) %>%
   group_by(haulid, grid, patch, year, btemp) %>% 
   summarise(dens = sum(number_at_length, na.rm = F)) %>% # get total no. scallops in each haul, of any size
   group_by(year, grid, patch) %>% 
@@ -207,6 +218,12 @@ dat_dens <- dat %>%
     mutate(lmean_sbt = lag(mean_sbt)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
+  # add in lagged sea bottom temperature (for version without small scallops < 80 mm)
+  dat_dens80 <- dat_dens80 %>%
+    arrange(grid, year) %>%
+    mutate(lmean_sbt = lag(mean_sbt)) %>%
+    filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
+  
   # plot to see which patches were selected
 dat_dens %>%
     group_by(grid, patch) %>%
@@ -218,7 +235,21 @@ dat_dens %>%
     geom_tile(aes(x = -grid_lon, y = grid_lat, fill = mean_dens)) +
   geom_text(aes(x = -grid_lon, y = grid_lat, label = patch), color = "white") +
   viridis::scale_fill_viridis()
- # ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
+  # ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
+
+# plot to see which patches were selected (excluding small scallops < 80 mm)
+dat_dens80 %>%
+  group_by(grid, patch) %>%
+  summarise(mean_dens = mean(mean_dens, na.rm = T),
+            mean_sbt = mean(mean_sbt, na.rm = T)) %>%
+  mutate(grid_lat = substr(grid, 1, 5),
+         grid_lon = as.numeric(substr(grid, 6, 11))) %>%
+  ggplot() +
+  geom_tile(aes(x = -grid_lon, y = grid_lat, fill = mean_dens)) +
+  geom_text(aes(x = -grid_lon, y = grid_lat, label = patch), color = "white") +
+  viridis::scale_fill_viridis() +
+  labs(title = "Excluding small scallops (< 80 mm)")
+# ggsave(here(plotsave, "AA_grid_map_large_only.png"), height = 6, width = 8, dpi = 400)
 
 # map where the NA values are
 dat_dens %>% 
@@ -249,6 +280,13 @@ dat_test_dens <- dat_dens %>%
   filter(year %in% test_years)
 
 dat_train_dens <- dat_dens %>% 
+  filter(year %in% train_years)
+
+# versions of dat_test/train_dens without small scallops for plotting
+dat_test_dens80 <- dat_dens80 %>% 
+  filter(year %in% test_years)
+
+dat_train_dens80 <- dat_dens80 %>% 
   filter(year %in% train_years)
 
 # get time dimension
@@ -357,7 +395,13 @@ year_index <- data.frame(year = sort(unique(c(dat_train_dens$year, dat_test_dens
 dat_train_dens <- dat_train_dens %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
 
+dat_train_dens80 <- dat_train_dens80 %>%
+  left_join(year_index) %>% mutate(year = index) %>% select(-index)
+
 dat_test_dens <- dat_test_dens %>%
+  left_join(year_index) %>% mutate(year = index) %>% select(-index)
+
+dat_test_dens80 <- dat_test_dens80 %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
 
 dat_train_lengths <- dat_train_lengths %>%
@@ -507,17 +551,17 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220608a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220414a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220610a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220610a.rds"))
 
-warmups <- 20000
-total_iterations <- 30000
+warmups <- 2000
+total_iterations <- 5000
 max_treedepth <-  10
 n_chains <-  1
 n_cores <- 1
-n_thin <- 40
+n_thin <- 8
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec.stan"), # check that it's the right model!
+stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec80.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -534,8 +578,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pme
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20220426d.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20220426a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20220610a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20220610a.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
 
@@ -549,30 +593,33 @@ quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.
 
 # Plot Topt/width posterior predictive distribution
 topt_plot = rstan::extract(stan_model_fit, c("Topt", "width"))
+lowersbt <- median(topt_plot$Topt)-3*median(topt_plot$width)
+uppersbt <- median(topt_plot$Topt)+3*median(topt_plot$width)
+
 topt_plot2 <- data.frame(
-  pd_med = dnorm(seq(-5, 25, by = .5), mean = median(topt_plot$Topt), sd = median(topt_plot$width)),
-  temp = seq(-5, 25, by = .5))
+  t_adjust = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - median(topt_plot$Topt))/median(topt_plot$width))^2),
+  temp = seq(lowersbt,uppersbt, by = .5))
 
 topt_plot3_CI = lapply(1:250, function(x){
-  data.frame(pd = dnorm(seq(-5,25, by = .5), mean = topt_plot$Topt[x], sd = topt_plot$width[x]),
+  data.frame(temp = seq(lowersbt,uppersbt, by = .5), 
+             topt = topt_plot$Topt[x], 
+             width = topt_plot$width[x],
              iter = x,
-             temp = seq(-5,25, by = .5))}) %>%
+             t_adjust = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - topt_plot$Topt[x])/topt_plot$width[x])^2))}) %>%
   do.call(rbind, .)
 
-
 ggplot(topt_plot2) +
-  geom_line(aes(x = temp, y = pd, group = as.factor(iter)), 
+  geom_line(aes(x = temp, y = t_adjust, group = as.factor(iter)), 
             data = topt_plot3_CI,
             color = "firebrick",
             alpha = .1) +
-  geom_line(aes(x = temp, y = pd_med),
+  geom_line(aes(x = temp, y = t_adjust),
             size = 1) +
   theme_bw() +
   theme(text = element_text(size = 14)) +
-  labs(x = "Sea bottom temperature (C)", y = "Recruitment suitability")
+  labs(x = "Maximum montly sea bottom temperature (C)", y = "Relative adult survival") # "Recruitment suitability"
 ggsave(here(plotsave, "AAA_plot_Topt&width_curve.png"))
 rm(topt_plot, topt_plot2, topt_plot3_CI)
-
 
 # a = rstan::extract(stan_model_fit, "theta_d")
 # hist(a$sigma_obs)
@@ -594,6 +641,11 @@ abund_p_y <- dat_train_dens %>%
   mutate(abundance = mean_dens * meanpatcharea) %>%
   mutate(grid_lat = substr(grid, 1, 4),
          grid_lon = as.numeric(substr(grid, 5, 9))) # note: this is set up for 1x1 grid currently
+
+abund_p_y80 <- dat_train_dens80 %>%
+  mutate(abundance = mean_dens * meanpatcharea) %>%
+  mutate(grid_lat = substr(grid, 1, 4),
+         grid_lon = as.numeric(substr(grid, 5, 9))) # note: this is set up for 1x1 grid currently
   
 # grab subset of cells from MA_9 group
 # unique(abund_p_y$patch[abund_p_y$grid %in% MA_9$grid]) # c(25, 26, 30, 31, 32, 43, 44, 45)
@@ -601,6 +653,10 @@ abund_p_y <- dat_train_dens %>%
 abund_p_y_hat <- tidybayes::spread_draws(stan_model_fit, dens_p_y_hat[patch,year]) %>%
   left_join(distinct(select(abund_p_y, grid, patch)))
 
+abund_p_y_hat80 <- tidybayes::spread_draws(stan_model_fit, dens_p_y_hat80[patch,year]) %>%
+  left_join(distinct(select(abund_p_y, grid, patch)))
+
+### Plot log mean abundance (all sizes) vs. time (observed and predicted)
 i = 18
 # look at raw density data for the patch if you want
 # test <- abund_p_y %>% 
@@ -624,6 +680,30 @@ ggsave(plot = abundance_v_time, filename=here(plotsave,
                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
 
+### Plot log mean abundance (>= 80 mm) vs. time (observed and predicted)
+i = 18
+# look at raw density data for the patch if you want
+# test <- abund_p_y %>% 
+#   filter(grid %in% unique(abund_p_y_hat$grid)[i])
+for( i in 1:np ) {
+  print(i)
+  patch_filter <- unique(abund_p_y_hat80$grid)[i]
+  abundance_v_time80 <- abund_p_y_hat80 %>% 
+    filter(grid %in% patch_filter) %>%
+    ggplot(aes(year, dens_p_y_hat80+1)) + 
+    stat_lineribbon() + 
+    geom_point(data = filter(abund_p_y80, grid %in% patch_filter), aes(year, abundance+1), color = "blue") +
+    facet_wrap(~grid, scales = "free_y") +
+    labs(x="Year",y="Abundance") + 
+    scale_fill_brewer() +
+    scale_y_log10()
+  abundance_v_time80
+  
+  ggsave(plot = abundance_v_time, filename=here(plotsave,
+                                                paste0("F_log_density80_v_time_no_length_comps_patch_",
+                                                       as.character(i), ".png")), width=5, height=5, dpi = 200)
+}
+
 # time series of predicted densities
 abund_p_y_hat %>%
   group_by(year, grid, patch) %>%
@@ -633,6 +713,17 @@ abund_p_y_hat %>%
 
 ggsave(filename=here(plotsave,
                      "G_dens_p_y_hat_timeseries.png"), 
+       width=5, height=5, dpi = 200)
+
+# time series of predicted densities (excluding < 80 mm scallops)
+abund_p_y_hat80 %>%
+  group_by(year, grid, patch) %>%
+  summarise(dens_p_y_hat80 = mean(dens_p_y_hat80)) %>%
+  ggplot() + 
+  geom_line(aes(x = year, y = dens_p_y_hat80, color = grid))
+
+ggsave(filename=here(plotsave,
+                     "G_dens_p_y_hat80_timeseries.png"), 
        width=5, height=5, dpi = 200)
 
 # time series of measured densities
@@ -645,8 +736,17 @@ ggsave(filename=here(plotsave,
                      "G2_dens_p_y_timeseries.png"), 
        width=5, height=5, dpi = 200)
 
+# time series of measured densities excluding < 80 mm scallops
+abund_p_y80 %>%
+  # filter(year < 35) %>%
+  ggplot() + 
+  geom_line(aes(x = year, y = abundance, color = grid))
 
-# NEW: map predicted densities
+ggsave(filename=here(plotsave,
+                     "G2_dens_p_y80_timeseries.png"), 
+       width=5, height=5, dpi = 200)
+
+# MAP predicted densities
 i = 7
 for( i in 1:ny ) {
   print(i)
@@ -672,190 +772,257 @@ abund_p_y_hat %>%
                                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
 
-
-
-# assess length comp fits
-
-n_p_l_y_hat <- tidybayes::gather_draws(stan_model_fit, n_p_l_y_hat[year,patch,length])
-saveRDS(n_p_l_y_hat, "results/n_p_l_y_hat_run20220426a.rds")
-
-n_p_l_y_hat <- readRDS("results/n_p_l_y_hat_run20220413a.rds")
-
-# neff <- tidybayes::gather_draws(stan_model_fit, n_eff[patch,year], n = 500)
-
-#neff <- tidybayes::gather_draws(stan_model_fit, n_eff[patch,year], n = 500)
-
-dat_train_lengths <- dat_train_lengths %>% 
-  group_by(patch, year) %>% 
-  mutate(p_length = sum_num_at_length / sum(sum_num_at_length))
-
-dat_train_lengths %>% 
-  group_by(year,patch) %>% 
-  summarise(n = sum(sum_num_at_length)) %>% 
-  # filter(year != 35) %>%
-  ggplot(aes(year, n, color =factor(patch))) + 
-  geom_point()
-ggsave(here(plotsave, "J_n_by_year_and_patch.png"))
-
-p = 15
-
-n_p_l_y_hat %>% 
-  ungroup() %>% 
-  filter(patch == p) %>% 
-  group_by(patch, year, .iteration) %>% 
-  mutate(pvalue = .value / sum(.value)) %>% 
-  ggplot(aes(length, pvalue)) + 
-  stat_lineribbon() + 
-  geom_point(data = dat_train_lengths %>% filter(patch == p), aes(length*10,p_length), color = "red", alpha = 0.2) +
-  facet_wrap(~year, scales = "free_y")
-
-ggsave(here(plotsave, "K_p_vs_length_by_year_patch15_times10.png"), width = 10, height= 10, dpi =400)
-
-# length frequency over time
-l_freq_time <- n_p_l_y_hat %>% 
-  ungroup() %>% 
-  ggplot(aes(x=length, y=..density.., weight=.value)) + 
-  geom_histogram(bins=50) +
-  facet_grid(patch~year)
-
-ggsave(l_freq_time, filename=here(plotsave,"L_length_freq_time_scallop.png"), scale=1.5, width=15, height=10, dpi = 400)
-
-# is there a temperature - recruitment relationship? 
-
-## first need to figure out which lengths correspond to age 0 
-length_at_age_key %>% 
-  ggplot(aes(x=length_bin, y=p_bin)) +
-  geom_line() + 
-  facet_wrap(~age)
-ggsave(here(plotsave, "M_length_at_age_curves.png"))
-
-## let's call recruits <5cm
-
-# selectivity_at_bin_df <- gather_draws(stan_model_fit, selectivity_at_bin[n_lbins])
-
-selectivity_at_bin_df <- data.frame(n_lbins = lbins,
-                                    .value = selectivity_at_bin)
-
-mean_sel <- selectivity_at_bin_df %>% 
-  group_by(n_lbins) %>% 
-  summarise(mean_sel = mean(.value)) %>% 
-  rename(length = n_lbins)
-
-# get proportion of recruits adjusted by selectivity
-recruits <- n_p_l_y_hat %>% 
-  left_join(mean_sel, by="length") %>% 
-  mutate(recruit = ifelse(length <=5, "yes", "no"),
-         val_post_sel = .value / mean_sel) %>% 
-  group_by(recruit, patch, year, .draw) %>% 
-  summarise(sumcount = sum(val_post_sel, na.rm = T)) %>% 
-  ungroup() %>% 
-  group_by(patch, year, .draw) %>% 
-  mutate(prop_recruit = sumcount / sum(sumcount, na.rm = T)) %>% 
-  filter(recruit == "yes")
-
-dat_train_sbt <- dat_train_dens # SCALLOP: because I didn't define a stand-alone sbt data frame
-recruits %>% group_by(patch, year) %>% 
-  summarize(mean_prop_rec = mean(prop_recruit)) %>% 
-  left_join(dat_train_sbt, by=c('patch','year')) %>% 
-  ggplot(aes(x=mean_sbt, y=mean_prop_rec, color=year)) +
-  geom_point() +
-  viridis::scale_color_viridis()
-
-ggsave(here(plotsave, "N_recruits.png"), height = 6, width = 6, dpi = 400)
-
-# another way to look at recruits vs. sbt
-recruits %>% group_by(patch, year) %>% 
-  summarize(mean_prop_rec = mean(prop_recruit)) %>% 
-  left_join(dat_train_sbt, by=c('patch','year')) %>%
-  filter(is.na(mean_sbt)==F) %>%
-  mutate(sbt_cat = cut(mean_sbt, breaks = c(0,6,9,12,15,18,21,24,30))) %>%
-  ggplot() +
-  geom_boxplot(aes(x = sbt_cat, y = mean_prop_rec)) +
-  theme_bw() +
-  labs(x = "Sea bottom temperature (C)")
-
-ggsave(here(plotsave, "N2_recruits_boxplot.png"), height = 6, width = 6, dpi = 400)
-
-# plot recruitment deviates
-# note that the length of rec_dev is actually 34 not 35
-gather_draws(stan_model_fit, rec_dev[ny]) %>% 
-  ggplot(aes(x=ny, y=.value)) + 
-  stat_lineribbon() + 
-  scale_fill_brewer()
-
-ggsave(here(plotsave, "O_rec_dev.png"), width = 6, height = 6, dpi = 400)
-
-# plot raw
-raw_v_time <- gather_draws(stan_model_fit, raw[ny]) %>%
-  ggplot(aes(x=ny, y=.value)) + 
-  stat_lineribbon() + 
-  scale_fill_brewer()
-ggsave(raw_v_time, filename=here(plotsave,"P_raw_v_time.png"))
-
-# plot actual recruitment
-n_p_a_y_hat <- gather_draws(stan_model_fit, n_p_a_y_hat[np, n_ages, ny]) %>%
-  left_join(distinct(dat_dens[,2:3]), by = c("np" = "patch"))
-
-n_p_a_y_hat_sum <- n_p_a_y_hat %>%
-  group_by(grid, np, n_ages, ny) %>%
-  summarise(nhat = median(.value),
-            q2.5 = quantile(.value, 0.025),
-            q97.5 = quantile(.value, 0.975),
-            .groups = "drop")
-
-i = 15
-for( i in unique(n_p_a_y_hat_sum$np)) {
+# MAP predicted densities of scallops at least 80 mm long
+i = 7
+for( i in 1:ny ) {
   print(i)
-  patch_filter <- unique(n_p_a_y_hat_sum$grid)[i]
-n_p_a_y_hat_sum %>%
-  filter(grid == patch_filter) %>%
-  ggplot(aes(x=ny, y=nhat)) +
-  geom_line(color = "firebrick") +
-  geom_ribbon(aes(x = ny, ymin = q2.5, ymax = q97.5),
-              fill = "firebrick", alpha = 0.25) +
-  facet_wrap(~n_ages) +
-  labs(y = "Individuals", title = patch_filter) + 
-  theme_bw()
-#scale_y_log10()
-ggsave(here(plotsave, 
-            paste0("Q_recruitment_n_age_by_patch_year",
-            "patch_", patch_filter, ".png")),
-       height = 10, width = 10, dpi = 400)
+  year_filter <- unique(abund_p_y_hat80$year)[i]
+  abund_p_y_hat80 %>% 
+    filter(year %in% year_filter) %>%
+    group_by(grid) %>%
+    summarize(dens_p_y_hat80 = mean(dens_p_y_hat80),
+              .groups = "drop") %>%
+    mutate(grid_lat = substr(grid, 1, 4),
+           grid_lon = as.numeric(substr(grid, 5, 9))) %>%
+    ggplot() + 
+    geom_tile(aes(x = grid_lon, y = grid_lat, fill = dens_p_y_hat80)) + 
+    geom_point(data = filter(abund_p_y80, year %in% year_filter), 
+               aes(x = grid_lon, y = grid_lat, color = abundance), 
+               pch = 16) +
+    labs(x="",y="", title = i) +
+    viridis::scale_fill_viridis() +
+    viridis::scale_color_viridis()
+  
+  ggsave(filename=here(plotsave,
+                       paste0("F2_dens_p_hat80_map_year_",
+                              as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
 
-# plot all ages over time
-n_p_a_y_hat %>% 
-  ggplot(aes(x=ny, y=.value)) +
-  stat_lineribbon(size = .5) +
-  scale_fill_brewer() +
-  facet_grid(np~n_ages)
-ggsave(here(plotsave, "R_n_p_a_y_hat_vs_age_year.png"),
-       width = 15, height = 15, dpi = 400)
+# observed vs. predicted mean abundance
+abund_obs_pred <- abund_p_y_hat %>%
+  group_by(grid, year) %>%
+  summarise(dens_p_y_hat = mean(dens_p_y_hat),
+            .groups = "drop") %>%
+  left_join(abund_p_y, by = c("grid", "year"))
+corr <- cor.test(x=abund_obs_pred$abundance, y=abund_obs_pred$dens_p_y_hat, method = 'spearman')
 
-# proj_n_p_a_y_hat %>% 
-#   ggplot(aes(x=`(ny_proj + 1)`, y=.value)) +
-#   stat_lineribbon() +
+abund_obs_pred %>%
+  ggplot() +
+  geom_point(aes(x = abundance, y = dens_p_y_hat),
+             color = "firebrick", size = 3,
+             shape = 1, alpha = 0.75) +
+  annotate("text", x = max(abund_obs_pred$abundance,na.rm = T)-100, 
+           y = min(abund_obs_pred$dens_p_y_hat)+100, 
+           label = paste0("SRC = ", round(corr$estimate,3)), hjust = 1, vjust = 0) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "Observed abundance", y = "Predicted abundance")
+
+ggsave(paste0(plotsave, "/H_observed_vs_predicted.png"))
+
+# observed vs. predicted mean abundance excluding small (< 80 mm) scallops
+abund_obs_pred80 <- abund_p_y_hat80 %>%
+  group_by(grid, year) %>%
+  summarise(dens_p_y_hat80 = mean(dens_p_y_hat80),
+            .groups = "drop") %>%
+  left_join(abund_p_y80, by = c("grid", "year"))
+corr <- cor.test(x=abund_obs_pred80$abundance, y=abund_obs_pred80$dens_p_y_hat80, method = 'spearman')
+
+abund_obs_pred80 %>%
+  ggplot() +
+  geom_point(aes(x = abundance, y = dens_p_y_hat80),
+             color = "firebrick", size = 3,
+             shape = 1, alpha = 0.75) +
+  annotate("text", x = max(abund_obs_pred80$abundance,na.rm = T)-100, 
+           y = min(abund_obs_pred80$dens_p_y_hat80)+100, 
+           label = paste0("SRC = ", round(corr$estimate,3)), hjust = 1, vjust = 0) +
+  # geom_abline(slope = 1, intercept = 0, color = "darkgray", lty = 2) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "Observed abundance", y = "Predicted abundance",
+       title = "Large scallops only (80+ mm)")
+
+ggsave(paste0(plotsave, "/H_observed80_vs_predicted80.png"))
+
+# # assess length comp fits
+# n_p_l_y_hat <- tidybayes::gather_draws(stan_model_fit, n_p_l_y_hat[year,patch,length])
+# saveRDS(n_p_l_y_hat, "results/n_p_l_y_hat_run20220426a.rds")
+# 
+# n_p_l_y_hat <- readRDS("results/n_p_l_y_hat_run20220413a.rds")
+# 
+# # neff <- tidybayes::gather_draws(stan_model_fit, n_eff[patch,year], n = 500)
+# 
+# #neff <- tidybayes::gather_draws(stan_model_fit, n_eff[patch,year], n = 500)
+# 
+# dat_train_lengths <- dat_train_lengths %>% 
+#   group_by(patch, year) %>% 
+#   mutate(p_length = sum_num_at_length / sum(sum_num_at_length))
+# 
+# dat_train_lengths %>% 
+#   group_by(year,patch) %>% 
+#   summarise(n = sum(sum_num_at_length)) %>% 
+#   # filter(year != 35) %>%
+#   ggplot(aes(year, n, color =factor(patch))) + 
+#   geom_point()
+# ggsave(here(plotsave, "J_n_by_year_and_patch.png"))
+# 
+# p = 15
+# 
+# n_p_l_y_hat %>% 
+#   ungroup() %>% 
+#   filter(patch == p) %>% 
+#   group_by(patch, year, .iteration) %>% 
+#   mutate(pvalue = .value / sum(.value)) %>% 
+#   ggplot(aes(length, pvalue)) + 
+#   stat_lineribbon() + 
+#   geom_point(data = dat_train_lengths %>% filter(patch == p), aes(length*10,p_length), color = "red", alpha = 0.2) +
+#   facet_wrap(~year, scales = "free_y")
+# 
+# ggsave(here(plotsave, "K_p_vs_length_by_year_patch15_times10.png"), width = 10, height= 10, dpi =400)
+# 
+# # length frequency over time
+# l_freq_time <- n_p_l_y_hat %>% 
+#   ungroup() %>% 
+#   ggplot(aes(x=length, y=..density.., weight=.value)) + 
+#   geom_histogram(bins=50) +
+#   facet_grid(patch~year)
+# 
+# ggsave(l_freq_time, filename=here(plotsave,"L_length_freq_time_scallop.png"), scale=1.5, width=15, height=10, dpi = 400)
+# 
+# # is there a temperature - recruitment relationship? 
+# 
+# ## first need to figure out which lengths correspond to age 0 
+# length_at_age_key %>% 
+#   ggplot(aes(x=length_bin, y=p_bin)) +
+#   geom_line() + 
+#   facet_wrap(~age)
+# ggsave(here(plotsave, "M_length_at_age_curves.png"))
+# 
+# ## let's call recruits <5cm
+# 
+# # selectivity_at_bin_df <- gather_draws(stan_model_fit, selectivity_at_bin[n_lbins])
+# 
+# selectivity_at_bin_df <- data.frame(n_lbins = lbins,
+#                                     .value = selectivity_at_bin)
+# 
+# mean_sel <- selectivity_at_bin_df %>% 
+#   group_by(n_lbins) %>% 
+#   summarise(mean_sel = mean(.value)) %>% 
+#   rename(length = n_lbins)
+# 
+# # get proportion of recruits adjusted by selectivity
+# recruits <- n_p_l_y_hat %>% 
+#   left_join(mean_sel, by="length") %>% 
+#   mutate(recruit = ifelse(length <=5, "yes", "no"),
+#          val_post_sel = .value / mean_sel) %>% 
+#   group_by(recruit, patch, year, .draw) %>% 
+#   summarise(sumcount = sum(val_post_sel, na.rm = T)) %>% 
+#   ungroup() %>% 
+#   group_by(patch, year, .draw) %>% 
+#   mutate(prop_recruit = sumcount / sum(sumcount, na.rm = T)) %>% 
+#   filter(recruit == "yes")
+# 
+# dat_train_sbt <- dat_train_dens # SCALLOP: because I didn't define a stand-alone sbt data frame
+# recruits %>% group_by(patch, year) %>% 
+#   summarize(mean_prop_rec = mean(prop_recruit)) %>% 
+#   left_join(dat_train_sbt, by=c('patch','year')) %>% 
+#   ggplot(aes(x=mean_sbt, y=mean_prop_rec, color=year)) +
+#   geom_point() +
+#   viridis::scale_color_viridis()
+# 
+# ggsave(here(plotsave, "N_recruits.png"), height = 6, width = 6, dpi = 400)
+# 
+# # another way to look at recruits vs. sbt
+# recruits %>% group_by(patch, year) %>% 
+#   summarize(mean_prop_rec = mean(prop_recruit)) %>% 
+#   left_join(dat_train_sbt, by=c('patch','year')) %>%
+#   filter(is.na(mean_sbt)==F) %>%
+#   mutate(sbt_cat = cut(mean_sbt, breaks = c(0,6,9,12,15,18,21,24,30))) %>%
+#   ggplot() +
+#   geom_boxplot(aes(x = sbt_cat, y = mean_prop_rec)) +
+#   theme_bw() +
+#   labs(x = "Sea bottom temperature (C)")
+# 
+# ggsave(here(plotsave, "N2_recruits_boxplot.png"), height = 6, width = 6, dpi = 400)
+# 
+# # plot recruitment deviates
+# # note that the length of rec_dev is actually 34 not 35
+# gather_draws(stan_model_fit, rec_dev[ny]) %>% 
+#   ggplot(aes(x=ny, y=.value)) + 
+#   stat_lineribbon() + 
+#   scale_fill_brewer()
+# 
+# ggsave(here(plotsave, "O_rec_dev.png"), width = 6, height = 6, dpi = 400)
+# 
+# # plot raw
+# raw_v_time <- gather_draws(stan_model_fit, raw[ny]) %>%
+#   ggplot(aes(x=ny, y=.value)) + 
+#   stat_lineribbon() + 
+#   scale_fill_brewer()
+# ggsave(raw_v_time, filename=here(plotsave,"P_raw_v_time.png"))
+# 
+# # plot actual recruitment
+# n_p_a_y_hat <- gather_draws(stan_model_fit, n_p_a_y_hat[np, n_ages, ny]) %>%
+#   left_join(distinct(dat_dens[,2:3]), by = c("np" = "patch"))
+# 
+# n_p_a_y_hat_sum <- n_p_a_y_hat %>%
+#   group_by(grid, np, n_ages, ny) %>%
+#   summarise(nhat = median(.value),
+#             q2.5 = quantile(.value, 0.025),
+#             q97.5 = quantile(.value, 0.975),
+#             .groups = "drop")
+# 
+# i = 15
+# for( i in unique(n_p_a_y_hat_sum$np)) {
+#   print(i)
+#   patch_filter <- unique(n_p_a_y_hat_sum$grid)[i]
+# n_p_a_y_hat_sum %>%
+#   filter(grid == patch_filter) %>%
+#   ggplot(aes(x=ny, y=nhat)) +
+#   geom_line(color = "firebrick") +
+#   geom_ribbon(aes(x = ny, ymin = q2.5, ymax = q97.5),
+#               fill = "firebrick", alpha = 0.25) +
+#   facet_wrap(~n_ages) +
+#   labs(y = "Individuals", title = patch_filter) + 
+#   theme_bw()
+# #scale_y_log10()
+# ggsave(here(plotsave, 
+#             paste0("Q_recruitment_n_age_by_patch_year",
+#             "patch_", patch_filter, ".png")),
+#        height = 10, width = 10, dpi = 400)
+# }
+# 
+# # plot all ages over time
+# n_p_a_y_hat %>% 
+#   ggplot(aes(x=ny, y=.value)) +
+#   stat_lineribbon(size = .5) +
 #   scale_fill_brewer() +
 #   facet_grid(np~n_ages)
-
-# detection stats 
-detect <- spread_draws(stan_model_fit, theta[patch,year])
-
-i = 15
-for( i in unique(n_p_a_y_hat_sum$np)) {
-  print(i)
-detect %>%
-   filter(patch == i) %>% 
-  ggplot(aes(x=year, y=theta)) +
-  stat_lineribbon() + 
-  facet_wrap(~patch) +
-  scale_fill_brewer()
-
-ggsave(here(plotsave, 
-            paste0("S_detection_stats_patch_", 
-                   i, ".png")))
-}
-
+# ggsave(here(plotsave, "R_n_p_a_y_hat_vs_age_year.png"),
+#        width = 15, height = 15, dpi = 400)
+# 
+# # detection stats 
+# detect <- spread_draws(stan_model_fit, theta[patch,year])
+# 
+# i = 15
+# for( i in unique(n_p_a_y_hat_sum$np)) {
+#   print(i)
+# detect %>%
+#    filter(patch == i) %>% 
+#   ggplot(aes(x=year, y=theta)) +
+#   stat_lineribbon() + 
+#   facet_wrap(~patch) +
+#   scale_fill_brewer()
+# 
+# ggsave(here(plotsave, 
+#             paste0("S_detection_stats_patch_", 
+#                    i, ".png")))
+# }
+# 
 beta_obs <- extract(stan_model_fit, "beta_obs")$beta_obs
 hist(beta_obs)
 
@@ -870,37 +1037,27 @@ theta_eq %>%
 ggsave(here(plotsave,
             "S2_beta_obs_effect_graphed.png"))
 
-###########
-# calculate summary statistics and evaluate range shifts
-###########
-
-# centroid position by year 
-  group_by(year) %>% 
-  summarise(centroid_lat = weighted.mean(x=as.numeric(substr(grid,1,5)), w=abundance))
-
-# model fit centroid -- should eventually estimate in model for proper SE -- just exploring here
-est_centroid <- abund_p_y_hat %>% 
-  group_by(year, .iteration) %>%  # IS THIS SUPPOSED TO BE .ITERATION? CHECK WHEN MODEL IS RUN FOR LONGER 
-  summarise(centroid_lat = weighted.mean(x=as.numeric(substr(grid,1,5)), w=dens_p_y_hat)) %>% 
-  ungroup()
-
-gg_centroid <- est_centroid %>% 
-  ggplot(aes(year, centroid_lat)) + 
-  stat_lineribbon() + 
-  scale_fill_brewer() +
-  geom_point(data = dat_centroid, aes(year, centroid_lat), color = "red") +
-  theme(legend.position = "none") +
-  labs(x="Year", y="Latitude", title="Centroid Position", fill="Credible Interval")
-gg_centroid
-ggsave(gg_centroid, filename=here(plotsave,"T_centroid_v_time_no_length_comps.png"))
-
-# patch abundance fraction every year 
+# patch abundance observed vs. expected tile plots
 est_patch_abund <- abund_p_y_hat %>% 
   group_by(year, patch) %>% 
   summarise(abundance = mean(dens_p_y_hat))
 
+est_patch_abund80 <- abund_p_y_hat80 %>% 
+  group_by(year, patch) %>% 
+  summarise(abundance = mean(dens_p_y_hat80))
+
 observed_abundance_tile <- abund_p_y %>% 
-  filter(abundance < 20000000) %>%
+  # filter(abundance < 20000000) %>%
+  ggplot(aes(x=year, y=patch, fill=abundance)) +
+  geom_tile() +
+  theme_bw() +
+  scale_x_continuous(breaks=seq(0, 36, 4)) +
+  scale_y_continuous(breaks=seq(0, 36, 4)) +
+  labs(title="Observed", x="Year", y="Patch", fill="Abundance") +
+  viridis::scale_fill_viridis()
+
+observed_abundance_tile80 <- abund_p_y80 %>% 
+  # filter(abundance < 20000000) %>%
   ggplot(aes(x=year, y=patch, fill=abundance)) +
   geom_tile() +
   theme_bw() +
@@ -918,40 +1075,25 @@ estimated_abundance_tile <- est_patch_abund %>%
   labs(title="Estimated", x="Year", y="Patch", fill="Abundance") +
   viridis::scale_fill_viridis()
 
+estimated_abundance_tile80 <- est_patch_abund80 %>% 
+  ggplot(aes(x=year, y=patch, fill=abundance)) +
+  geom_tile() +
+  theme_bw() +
+  scale_x_continuous(breaks=seq(0, 36, 4)) +
+  scale_y_continuous(breaks=seq(0, 36, 4)) +
+  labs(title="Estimated", x="Year", y="Patch", fill="Abundance") +
+  viridis::scale_fill_viridis()
+
 ggsave(observed_abundance_tile, filename=here(plotsave,"U_abundance_v_time_observed_tileplot_no_length_comps2.png"))
 ggsave(estimated_abundance_tile, filename=here(plotsave,"V_abundance_v_time_estimated_tileplot_no_length_comps.png"))
-
-# who's doing the colonizing?
-dat_train_lengths %>% 
-  group_by(patch, length) %>% 
-  arrange(year) %>% 
-  mutate(logratio = log(sum_num_at_length / lag(sum_num_at_length))) %>% 
-  filter(logratio < Inf, logratio > -Inf) %>% 
-  ungroup() %>% 
-  ggplot(aes(x=year, y=logratio, group=length, color=length)) +
-  geom_point() + 
-  geom_line() +
-  scale_color_viridis_c() +
-  facet_wrap(~patch)
-
-dat_train_lengths %>% 
-  ggplot(aes(x=year, y=sum_num_at_length, fill=length)) + 
-  geom_bar(stat="identity") +
-  facet_wrap(~patch) +
-  scale_fill_viridis_c() +
-  theme_bw()
-
-
-dat_train_lengths %>% 
-  ggplot(aes(x=year, y=sum_num_at_length, fill=length)) + 
-  geom_bar(position="fill", stat="identity") +
-  scale_fill_viridis_c() +
-  theme_bw()  
+ggsave(observed_abundance_tile80, filename=here(plotsave,"U_abundance80_v_time_observed_tileplot_no_length_comps2.png"))
+ggsave(estimated_abundance_tile80, filename=here(plotsave,"V_abundance80_v_time_estimated_tileplot_no_length_comps.png"))
 
 # plot temperature difference from optimum over space and time
 Topt <- extract(stan_model_fit, "Topt")$Topt
 hist(Topt) # note, not normally distributed
 
+dat_train_sbt <- dat_train_dens # SCALLOP: because I didn't define a stand-alone sbt data frame
 dat_train_sbt %>%
   mutate(Tdiff = mean_sbt - median(Topt)) %>%
   ggplot(aes(x=year, y=patch, fill=Tdiff)) +
@@ -959,6 +1101,15 @@ dat_train_sbt %>%
   scale_fill_gradient2(low="blue", high="red", mid="white", midpoint=0)
 
 ggsave(here(plotsave, "W_Tdiff_by_patch_yearB.png"))
+
+
+
+
+
+##################################
+## ... not using the code below yet
+
+
 
 ########
 # evaluate forecast
