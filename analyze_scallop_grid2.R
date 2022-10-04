@@ -115,7 +115,7 @@ if(grid_1x1 == 1){
                                   grid_lon-0.25),
            grid = paste0(grid_lat,grid_lon))
   
-  clim <- clim %>%
+  clim1x1 <- clim %>%
     mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
                                   grid_lat-0.25,
                                 substr(grid_lat,4,5)=="25" ~
@@ -124,7 +124,9 @@ if(grid_1x1 == 1){
                                   grid_lon+0.25,
                                 substr(grid_lon,5,6)=="25" ~
                                   grid_lon-0.25),
-           grid = paste0(grid_lat,grid_lon))
+           grid = paste0(grid_lat,grid_lon)) %>%
+    group_by(grid, year) %>%
+    summarise(across(where(is.numeric), mean))
   
 }
 
@@ -409,8 +411,19 @@ dat_train_dens <- dat_train_dens %>%
 dat_train_dens80 <- dat_train_dens80 %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
 
+# temporary climate data to allow complete climate data in the test data
+if(btemp_meas == "mean"){tmp7 <- clim1x1 %>% select(grid, year, mean_temp)}
+if(btemp_meas == "min"){tmp7 <- clim1x1 %>% select(grid, year, min_temp)}
+if(btemp_meas == "max"){tmp7 <- clim1x1 %>% select(grid, year, max_temp)}
+
 dat_test_dens <- dat_test_dens %>%
-  left_join(year_index) %>% mutate(year = index) %>% select(-index)
+  left_join(year_index) %>% 
+  # need to re-add sea bottom temperature to projected years so it lacks NAs
+    # note: this should ultimately be fixed to occur at the start to streamline
+  left_join(tmp7, by = c("grid", "year"))
+  mutate(year = index) %>% 
+  select(-index) %>%
+  data.frame(year = c(years, years_proj))
 
 dat_test_dens80 <- dat_test_dens80 %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
