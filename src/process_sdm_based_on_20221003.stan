@@ -170,7 +170,8 @@ parameters{
   
   real<lower=0, upper=1> beta_obs; // controls how fast detection goes up with abundance
   
-  real<lower=0, upper=0.333> d; // dispersal fraction (0.333 = perfect admixture)
+  // remove this if dispersal is estimated (not set to zero)
+  //real<lower=0, upper=0.333> d; // dispersal fraction (0.333 = perfect admixture)
   
   real <lower = 0> theta_d;
   
@@ -199,11 +200,17 @@ transformed parameters{
   
   real dens_p_y_hat [np, ny_train]; // for tracking sum density 
   
+  real dens_p_y_hat80 [np, ny_train]; // for tracking sum density >= 80 mm
+
   vector[ny_train-1] rec_dev; // array of realized recruitment deviates, also now only 1/yr (it's a good or bad year everywhere)
   
-  vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
+  //commented while manual_selectivity==1
+  //vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
   
   real surv[np, n_ages, ny_train];
+  
+  //remove this if dispersal is not set to zero
+  real d = 0;
   
   real ssb0;
   
@@ -248,7 +255,8 @@ transformed parameters{
   
   length_50_sel = loo * p_length_50_sel; // Dan made a note to change this sometime
   
-  selectivity_at_bin = 1.0 ./ (1 + exp(-log(19) * ((bin_mids - length_50_sel) / sel_delta))); // selectivity ogive at age
+  //commented while manual_selectivity==1
+  //selectivity_at_bin = 1.0 ./ (1 + exp(-log(19) * ((bin_mids - length_50_sel) / sel_delta))); // selectivity ogive at age
   
   // mean_selectivity_at_age = length_at_age_key * selectivity_at_bin; // calculate mean selectivity at age given variance in length at age
   
@@ -290,13 +298,14 @@ transformed parameters{
   for(p in 1:np){
     for(a in 1:n_ages){
       if(a==1){
-        // n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
-        
+
         if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
-          n_p_a_y_hat[p,a,1] = mean_recruits * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          //n_p_a_y_hat[p,a,1] = mean_recruits * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
         }
         if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
-          n_p_a_y_hat[p,a,1] = mean_recruits * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          //n_p_a_y_hat[p,a,1] = mean_recruits * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          n_p_a_y_hat[p,a,1] = mean_recruits[p] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
         }
         if(T_dep_recruitment==0 && spawner_recruit_relationship==1){
           n_p_a_y_hat[p,a,1] = r0 * 0.1; // scale it down a bit -- historical fishing was still occurring
@@ -334,10 +343,12 @@ transformed parameters{
       // density-independent, temperature-dependent recruitment of age 1
       
       if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
-        n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
+        //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
+        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
       }
       if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
-        n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
+        //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
+        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
       }
       
       if(T_dep_recruitment==0 && spawner_recruit_relationship==1){
@@ -401,6 +412,8 @@ transformed parameters{
       
       dens_p_y_hat[p,y] = sum((to_vector(n_p_l_y_hat[y,p,1:n_lbins])));
       
+      dens_p_y_hat80[p,y] = sum((to_vector(n_p_l_y_hat[y,p,80:n_lbins])));
+
       theta[p,y] = ((1/(1+exp(-beta_obs*dens_p_y_hat[p,y]))) - 0.5)*2;
       // subtracting 0.5 and multiplying by 2 is a hacky way to get theta[0,1]
       
@@ -440,9 +453,12 @@ model {
   // log_f ~ normal(log(m / 2),.5);
   
   if(spawner_recruit_relationship==0){
-    log_mean_recruits ~ normal(7,5);
     raw ~ normal(0, sigma_r);
     sigma_r ~ normal(.7,.2);
+    
+    for(i in 1:np){
+    log_mean_recruits[i] ~ normal(7,5);
+    }
   }
   
   if(spawner_recruit_relationship==1){
@@ -458,7 +474,8 @@ model {
   
   alpha ~ normal(0,.25); // autocorrelation prior
   
-  d ~ normal(0.1, 0.1); // dispersal rate as a proportion of total population size within the patch
+  // uncomment this if d is estimated (not set at zero)
+  //d ~ normal(0.1, 0.1); // dispersal rate as a proportion of total population size within the patch
   
   // sigma ~ normal(1,.1);  // total error prior
   // 
