@@ -115,6 +115,17 @@ if(grid_1x1 == 1){
                                   grid_lon-0.25),
            grid = paste0(grid_lat,grid_lon))
   
+  clim <- clim %>%
+    mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
+                                  grid_lat-0.25,
+                                substr(grid_lat,4,5)=="25" ~
+                                  grid_lat+0.25),
+           grid_lon = case_when(substr(grid_lon,5,6)=="75" ~
+                                  grid_lon+0.25,
+                                substr(grid_lon,5,6)=="25" ~
+                                  grid_lon-0.25),
+           grid = paste0(grid_lat,grid_lon))
+  
 }
 
 # subset data by season
@@ -474,8 +485,10 @@ sbt_proj <- array(NA, dim=c(np,ny_proj))
 for(p in 1:np){
   print(p)
   for(y in 1:ny_proj){
-    tmp6 <- dat_test_dens %>% filter(patch==p, year==y) 
+    tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+    if(nrow(tmp6) != 0){
     sbt_proj[p,y] <- tmp6$mean_sbt
+    }
   }
 }
 
