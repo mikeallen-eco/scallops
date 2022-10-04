@@ -30,6 +30,7 @@ plotsave <- "results/run20221003a"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
+clim_avg <- clim # rename so clim can be used again if 1x1 grid spacing is used
 
 #############
 # make model decisions
@@ -79,28 +80,7 @@ dat <- read_csv(here("processed-data","scallop_catch_at_length_mo.csv")) %>%
                                 trunc(lon)-0.25,
                               abs(lon-trunc(lon))>=0.5 ~ 
                                 trunc(lon)-0.75),
-         grid = paste0(grid_lat, grid_lon)) %>%
-  left_join(clim, by = c("grid", "grid_lat", "grid_lon",
-                         "year"))
-
-# add the appropriate sbt measurement (min, mean, or max)
-if(btemp_meas == "mean"){
-dat <- dat %>%
-  rename(btemp_old = btemp,
-         btemp = mean_temp)
-}
-
-if(btemp_meas == "min"){
-dat <- dat %>%
-  rename(btemp_old = btemp,
-         btemp = min_temp)
-}
-
-if(btemp_meas == "max"){
-  dat <- dat %>%
-    rename(btemp_old = btemp,
-           btemp = max_temp)
-}
+         grid = paste0(grid_lat, grid_lon))
 
 # rename grid cells if cell size is set to 1x1 degree
 if(grid_1x1 == 1){
@@ -115,7 +95,7 @@ if(grid_1x1 == 1){
                                   grid_lon-0.25),
            grid = paste0(grid_lat,grid_lon))
   
-  clim1x1 <- clim %>%
+  clim_avg <- clim %>%
     mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
                                   grid_lat-0.25,
                                 substr(grid_lat,4,5)=="25" ~
@@ -201,47 +181,72 @@ dat_lengths80 <- dat %>%
             .groups = "drop") %>%
   filter(is.na(length) == FALSE)
 
+# subset appropriate climate variable (e.g., SBT min, mean, or max)
+if(btemp_meas == "mean"){
+  clim_avg <- clim_avg %>%
+    select(grid, year, mean_temp) %>%
+    rename(climvar = mean_temp)
+}
+
+if(btemp_meas == "min"){
+  clim_avg <- clim_avg %>%
+    select(grid, year, min_temp) %>%
+    rename(climvar = min_temp)
+}
+
+if(btemp_meas == "max"){
+  clim_avg <- clim_avg %>%
+    select(grid, year, max_temp) %>%
+    rename(climvar = max_temp)
+}
+
 # prep dat dens data
 dat_dens <- dat %>% 
   group_by(haulid, grid, patch, year, btemp) %>% 
-  summarise(dens = sum(number_at_length, na.rm = F)) %>% # get total no. scallops in each haul, of any size
+  summarise(dens = sum(number_at_length, na.rm = F),
+            .groups = "drop") %>% # get total no. scallops in each haul, of any size
   group_by(year, grid, patch) %>% 
   summarise(mean_dens = mean(dens, na.rm = T),
-            mean_sbt = mean(btemp, na.rm = T),
+            btemp_morely = mean(btemp, na.rm = T),
             n_haul = sum(haulid!="temp"),
-            .groups = "drop") # get mean density (all sizes) / haul for the patch*year combo 
+            .groups = "drop") %>% # get mean density (all sizes) / haul for the patch*year combo 
+  left_join(clim_avg, by = c("grid", "year"))
+  
 
 # prep dat dens data, excluding smaller scallops (< 80 mm)
 dat_dens80 <- dat %>% 
   filter(length >= 8) %>%
   group_by(haulid, grid, patch, year, btemp) %>% 
-  summarise(dens = sum(number_at_length, na.rm = F)) %>% # get total no. scallops in each haul, of any size
+  summarise(dens = sum(number_at_length, na.rm = F),
+            .groups = "drop") %>% # get total no. scallops in each haul, of any size
   group_by(year, grid, patch) %>% 
   summarise(mean_dens = mean(dens, na.rm = T),
-            mean_sbt = mean(btemp, na.rm = T),
+            btemp_morely = mean(btemp, na.rm = T),
             n_haul = sum(haulid!="temp"),
-            .groups = "drop") # get mean density (all sizes) / haul for the patch*year combo 
+            .groups = "drop") %>% # get mean density (all sizes) / haul for the patch*year combo 
+  left_join(clim_avg, by = c("grid", "year"))
 
+# create patch ID and count patches
   patches <- sort(unique(use_patches$grid))
   np = length(patches) 
   
   # add in lagged sea bottom temperature
   dat_dens <- dat_dens %>%
     arrange(grid, year) %>%
-    mutate(lmean_sbt = lag(mean_sbt)) %>%
+    mutate(lclimvar = lag(climvar)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
   # add in lagged sea bottom temperature (for version without small scallops < 80 mm)
   dat_dens80 <- dat_dens80 %>%
     arrange(grid, year) %>%
-    mutate(lmean_sbt = lag(mean_sbt)) %>%
+    mutate(lclimvar = lag(climvar)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
   # plot to see which patches were selected
 dat_dens %>%
     group_by(grid, patch) %>%
     summarise(mean_dens = mean(mean_dens, na.rm = T),
-              mean_sbt = mean(mean_sbt, na.rm = T)) %>%
+              climvar = mean(climvar, na.rm = T)) %>%
     mutate(grid_lat = substr(grid, 1, 5),
            grid_lon = as.numeric(substr(grid, 6, 11))) %>%
   ggplot() +
@@ -254,7 +259,7 @@ dat_dens %>%
 dat_dens80 %>%
   group_by(grid, patch) %>%
   summarise(mean_dens = mean(mean_dens, na.rm = T),
-            mean_sbt = mean(mean_sbt, na.rm = T)) %>%
+            climvar = mean(climvar, na.rm = T)) %>%
   mutate(grid_lat = substr(grid, 1, 5),
          grid_lon = as.numeric(substr(grid, 6, 11))) %>%
   ggplot() +
@@ -411,19 +416,8 @@ dat_train_dens <- dat_train_dens %>%
 dat_train_dens80 <- dat_train_dens80 %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
 
-# temporary climate data to allow complete climate data in the test data
-if(btemp_meas == "mean"){tmp7 <- clim1x1 %>% select(grid, year, mean_temp)}
-if(btemp_meas == "min"){tmp7 <- clim1x1 %>% select(grid, year, min_temp)}
-if(btemp_meas == "max"){tmp7 <- clim1x1 %>% select(grid, year, max_temp)}
-
 dat_test_dens <- dat_test_dens %>%
-  left_join(year_index) %>% 
-  # need to re-add sea bottom temperature to projected years so it lacks NAs
-    # note: this should ultimately be fixed to occur at the start to streamline
-  left_join(tmp7, by = c("grid", "year"))
-  mutate(year = index) %>% 
-  select(-index) %>%
-  data.frame(year = c(years, years_proj))
+  left_join(year_index) %>% mutate(year = index) %>% select(-index)
 
 dat_test_dens80 <- dat_test_dens80 %>%
   left_join(year_index) %>% mutate(year = index) %>% select(-index)
@@ -455,21 +449,23 @@ for(p in 1:np){
 
 plot(len[20,,20])
 
+# create mean density array for Stan
 dens <- array(NA, dim=c(np, ny))
 for(p in 1:np){
   print(p)
   for(y in 1:ny){
     tmp2 <- dat_train_dens %>% filter(patch==p, year==y) 
-    dens[p,y] <- tmp2$mean_dens *meanpatcharea
+    dens[p,y] <- tmp2$mean_dens * meanpatcharea
   }
 }
 
+# create climate variable array for Stan (called sbt but could be o2 as well)
 sbt <- array(NA, dim=c(np,ny))
 for(p in 1:np){
   print(p)
   for(y in 1:ny){
     tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
-    sbt[p,y] <- tmp3$mean_sbt
+    sbt[p,y] <- tmp3$climvar
   }
 }
 
@@ -480,7 +476,7 @@ for(p in 1:np){
   print(p)
   for(y in 1:ny){
     tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
-    sbt[p,y] <- tmp3$lmean_sbt
+    sbt[p,y] <- tmp3$lclimvar
   }
 }
 } # close if lagged_sbt = 1
@@ -500,7 +496,7 @@ for(p in 1:np){
   for(y in 1:ny_proj){
     tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
     if(nrow(tmp6) != 0){
-    sbt_proj[p,y] <- tmp6$mean_sbt
+    sbt_proj[p,y] <- tmp6$climvar
     }
   }
 }
@@ -572,12 +568,12 @@ stan_data <- list(
   #wt_at_age = wt_at_age,
   do_dirichlet = do_dirichlet,
   eval_l_comps = eval_l_comps, # evaluate length composition data? 0=no, 1=yes
-  T_dep_mortality = T_dep_mortality, # CURRENTLY NOT REALLY WORKING
+  T_dep_mortality = T_dep_mortality, 
   T_dep_recruitment = T_dep_recruitment, # think carefully before making more than one of the temperature dependencies true
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20220610a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221004a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220610a.rds"))
 
 warmups <- 2000
