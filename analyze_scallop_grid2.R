@@ -574,7 +574,7 @@ stan_data <- list(
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221004a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20220610a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221004a.rds"))
 
 warmups <- 2000
 total_iterations <- 5000
@@ -583,7 +583,7 @@ n_chains <-  1
 n_cores <- 1
 n_thin <- 8
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_d0_grid2_NA2_sel_pmeanrec80.stan"), # check that it's the right model!
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
