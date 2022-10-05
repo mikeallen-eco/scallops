@@ -52,9 +52,10 @@ eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 0 # Alexa's note: CURRENTLY NOT REALLY WORKING
 T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
-run_forecast=0
+run_forecast=1
 time_varying_f = TRUE
 btemp_meas <- "mean" # "min", "mean", or "max"
+wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
 # the f-at-age data starts in 1982; fill in the previous years with the earliest year of data
@@ -508,27 +509,27 @@ for(a in min_age:max_age){
   for(y in 1:ny){
     if(time_varying_f==TRUE){
       tmp4 <- dat_f_age %>% filter(age==a, year==y) 
-      f[a,y] <- tmp4$f # Alexa had a+1 because matrix indexing starts at 1 not 0
+      f[a,y] <- tmp4$f # Alexa had a+1 because matrix indexing starts at 1 not 0; but scallops has no age 0
     } else{
       f[a,y] <- f_prep
     }
   }
 }
 
-# I used f_proj <- f instead of below for now
+# Initially, I used f_proj <- f instead of below for now
 # because I'm using same years training/proj & that breaks this code
-f_proj <- f
-# f_proj <- array(NA, dim=c(n_ages,(ny_proj))) 
-# for(a in min_age:max_age){
-#   for(y in 1:(ny_proj+1)){
-#     if(time_varying_f==TRUE){
-#       tmp5 <- dat_f_age_proj %>% filter(age==a, year==y) 
-#       f_proj[a,y] <- tmp5$f # Alexa added 1 because ages started at 0 and matrix indexing starts at 1 not 0
-#     } else{
-#       f_proj[a,y] <-f_prep
-#     }
-#   }
-# }
+# f_proj <- f
+f_proj <- array(NA, dim=c(n_ages,(ny_proj+1)))
+for(a in min_age:max_age){
+  for(y in 1:(ny_proj+1)){
+    if(time_varying_f==TRUE){
+      tmp5 <- dat_f_age_proj %>% filter(age==a, year==y)
+      f_proj[a,y] <- tmp5$f # Alexa added 1 because ages started at 0 and matrix indexing starts at 1 not 0; but scallops have no age 0
+    } else{
+      f_proj[a,y] <-f_prep
+    }
+  }
+}
 
 a <- seq(min_age, max_age)
 
@@ -565,7 +566,7 @@ stan_data <- list(
   sel_100 = 4, # not sure about this 
   age_at_maturity = age_at_maturity,
   l_at_a_key = l_at_a_mat,
-  #wt_at_age = wt_at_age,
+  wt_at_age = wt_at_age,
   do_dirichlet = do_dirichlet,
   eval_l_comps = eval_l_comps, # evaluate length composition data? 0=no, 1=yes
   T_dep_mortality = T_dep_mortality, 
@@ -577,18 +578,18 @@ saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221004a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221004a.rds"))
 
 warmups <- 2000
-total_iterations <- 5000
+total_iterations <- 4000
 max_treedepth <-  10
-n_chains <-  1
-n_cores <- 1
-n_thin <- 8
+n_chains <-  3
+n_cores <- 3
+n_thin <- 10
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
+stan_model_fit2 <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
-                           init = list(list(log_mean_recruits = rep(log(1000), 36),
+                           init = list(list(log_mean_recruits = rep(log(1000), np),
                                             theta_d = 1,
                                            ssb0=1000000)),
                        iter = total_iterations,
@@ -600,8 +601,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20220610a.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20220610a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221005a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20221005a.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
 
@@ -612,6 +613,19 @@ quantile(rstan::extract(stan_model_fit, "sigma_obs")$sigma_obs, c(0.025, 0.5, 0.
 quantile(rstan::extract(stan_model_fit, "beta_obs")$beta_obs, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "theta_d")$theta_d, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.025, 0.5, 0.975))
+
+# examine T_adjust (modeled and projected)
+test=apply(rstan::extract(stan_model_fit, "T_adjust")$T_adjust, c(2,3), median)
+plot(test[i,], ylim = c(0,1), type = "l")
+for(i in 1:np){
+  points(test[i,], ylim = c(0,1), type = "l")
+}
+test=apply(rstan::extract(stan_model_fit, "T_adjust_proj")$T_adjust_proj, c(2,3), median)
+plot(test[i,], ylim = c(0,1), type = "l")
+for(i in 1:np){
+  points(test[i,], ylim = c(0,1), type = "l")
+}
+rm(test)
 
 # Plot Topt/width posterior predictive distribution
 topt_plot = rstan::extract(stan_model_fit, c("Topt", "width"))

@@ -557,7 +557,9 @@ generated quantities {
   real surv_proj[n_ages, (ny_proj+1)];
   matrix[np, n_lbins] proj_n_p_l_y_hat[ny_proj];
   real proj_dens_p_y_hat [np, ny_proj];
-
+  real proj_dens_p_y_hat80 [np, ny_proj];
+  real proj_dens_p_y_hat80_lambda[np, ny_proj];
+  real dens_p_y_hat80_lambda[np, ny_train];
 
   if(run_forecast==1){
   for(p in 1:np){
@@ -599,10 +601,10 @@ generated quantities {
     for(p in 1:np){
 
       if(T_dep_recruitment==1){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
       }
       if(T_dep_recruitment==0){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2);
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2);
       }
 
       if(age_at_maturity > 1){
@@ -636,12 +638,32 @@ generated quantities {
 
       proj_n_p_l_y_hat[y,p,1:n_lbins] = ((l_at_a_key' * to_vector(proj_n_p_a_y_hat[p,1:n_ages,y])) .* selectivity_at_bin)'; // convert numbers at age to numbers at length. The assignment looks confusing here because this is an array of length y containing a bunch of matrices of dim p and n_lbins
       proj_dens_p_y_hat[p,y] = sum((to_vector(proj_n_p_l_y_hat[y,p,1:n_lbins])));
-
+      proj_dens_p_y_hat80[p,y] = sum((to_vector(proj_n_p_l_y_hat[y,p,80:n_lbins])));
+    
     }
   }
+  
+  // to estimate projected annual population change
+  for(p in 1:np){
+    
+  proj_dens_p_y_hat80_lambda[p,1] = proj_dens_p_y_hat80[p,1] / proj_dens_p_y_hat[p,ny_train];
+
+  for(y in 2:(ny_proj)){
+
+  proj_dens_p_y_hat80_lambda[p,y] = proj_dens_p_y_hat80[p,y] / proj_dens_p_y_hat80[p,y-1];
+  
+    }
+  }
+  
+  // to estimate observed annual population change
+  for(p in 1:np){
+    for(y in 1:(ny_train-1)){
+
+  dens_p_y_hat80_lambda[p,y] = dens_p_y_hat80[p,y+1] / proj_dens_p_y_hat80[p,y];
+  
+    }
+  }
+    
 }
 
 }
-
-
-
