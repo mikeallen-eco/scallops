@@ -15,7 +15,7 @@ library(here)
 library(magrittr)
 library(rstan)
 library(Matrix)
-library(ggridges)
+# library(ggridges)
 # library(rstanarm)
 library(geosphere)
 # library(ggridges)
@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20221006b"
+plotsave <- "results/run20221010b"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -44,13 +44,13 @@ max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
-use_custom_grid = 0
-custom_grid_vector = NULL # vector of grid names you want to include
+use_custom_grid = 1
+custom_grid_vector = c("39.5-72.5", "39.5-73.5") # NULL # vector of grid names you want to include; NULL = none
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 0 # 
-T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
+T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
@@ -529,10 +529,6 @@ for(a in min_age:max_age){
   }
 }
 
-a <- seq(min_age, max_age)
-
-check <- a %*% l_at_a_mat
-
 ######
 # fit model
 ######
@@ -571,11 +567,11 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221006a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221011a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221011a.rds"))
 
-warmups <- 1000
-total_iterations <- 1250
+warmups <- 400
+total_iterations <- 500
 max_treedepth <-  10
 n_chains <- 2
 n_cores <- 2
@@ -604,10 +600,13 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221010d.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20221006b.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221011a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20221011a.rds"))
+
+bayesplot::mcmc_pairs(stan_model_fit)
+
 # library(shinystan)
-# launch_shinystan(stan_model_fit)
+launch_shinystan(stan_model_fit)
 
 # examine rhats
 summary(stan_model_fit)$summary$Rhat
