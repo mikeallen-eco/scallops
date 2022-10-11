@@ -467,7 +467,7 @@ model {
     log_r0 ~ normal(15,5);
   }
   
-  Topt ~ normal(18, 4);
+  Topt ~ normal(8.7, 20);
   
   width ~ normal(4, 4); 
   

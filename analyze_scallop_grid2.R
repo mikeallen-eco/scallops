@@ -49,8 +49,8 @@ custom_grid_vector = NULL # vector of grid names you want to include
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 1 # 
-T_dep_recruitment = 0 # think carefully before making more than one of the temperature dependencies true
+T_dep_mortality = 0 # 
+T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
@@ -571,15 +571,15 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221010a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221010a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221006a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
 
-warmups <- 2000
-total_iterations <- 4000
+warmups <- 1000
+total_iterations <- 1250
 max_treedepth <-  10
-n_chains <-  3
-n_cores <- 3
-n_thin <- 10
+n_chains <- 2
+n_cores <- 2
+n_thin <- 1
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
 init_rec <- log(1e-06 + init_rec1$mean_dens*100)
@@ -593,9 +593,6 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                             theta_d = 1,
                                            ssb0=1000000),
                                        list(log_mean_recruits = init_rec, #rep(log(1000), np),
-                                            theta_d = 1,
-                                            ssb0=1000000),
-                                       list(log_mean_recruits = init_rec, # rep(log(1000), np),
                                             theta_d = 1,
                                             ssb0=1000000)),
                        iter = total_iterations,
