@@ -18,7 +18,7 @@ library(Matrix)
 library(ggridges)
 # library(rstanarm)
 library(geosphere)
-library(ggridges)
+# library(ggridges)
 # library(Amelia) # seems to interfere with Stan
 funs <- list.files("functions")
 sapply(funs, function(x) source(file.path("functions",x)))
@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20221003a"
+plotsave <- "results/run20221006b"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -39,8 +39,8 @@ train_years <- 1980:2004 # set training year range
 test_years <- 2005:2014 # set testing year range
 season <- "fall" # "spring", "fall", or "both
 grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
-max_NA_dens <- 10 # set max number of NA dens values for each cell
-max_NA_sbt <- 10 # set max number of NA sbt values for each cell
+max_NA_dens <- 4 # set max number of NA dens values for each cell
+max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
@@ -49,8 +49,8 @@ custom_grid_vector = NULL # vector of grid names you want to include
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # Alexa's note: CURRENTLY NOT REALLY WORKING
-T_dep_recruitment = 1 # think carefully before making more than one of the temperature dependencies true
+T_dep_mortality = 1 # 
+T_dep_recruitment = 0 # think carefully before making more than one of the temperature dependencies true
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
@@ -487,7 +487,7 @@ dens_notNA <- array(1, dim(dens))
 dens_notNA[which(is.na(dens))] <- 0
 dens_notNA[which(is.na(sbt))] <- 0
 
-# assign a dummy variable to all NA values in dens and sbt
+# assign a dummy numeric value to all NAs in dens and sbt
 dens[is.na(dens)] <- 999999
 sbt[is.na(sbt)] <- 999999
 
@@ -516,9 +516,7 @@ for(a in min_age:max_age){
   }
 }
 
-# Initially, I used f_proj <- f instead of below for now
-# because I'm using same years training/proj & that breaks this code
-# f_proj <- f
+# f_proj - f values for projected years
 f_proj <- array(NA, dim=c(n_ages,(ny_proj+1)))
 for(a in min_age:max_age){
   for(y in 1:(ny_proj+1)){
@@ -559,11 +557,10 @@ stan_data <- list(
   loo=loo,
   t0=t0,
   cv=cv,
-  length_50_sel_guess=40, # GUESS, check stock assessment
+  length_50_sel_guess=60, # based on trawl selectivity data from Dvora
   n_lbins = n_lbins, 
-  age_sel = 0,
   bin_mids=lbins+0.5, # also not sure if this is the right way to calculate the midpoints
-  sel_100 = 4, # not sure about this 
+  sel_100 = 3, # based on age at length data 
   age_at_maturity = age_at_maturity,
   l_at_a_key = l_at_a_mat,
   wt_at_age = wt_at_age,
@@ -574,8 +571,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221004a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221004a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221010a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221010a.rds"))
 
 warmups <- 2000
 total_iterations <- 4000
@@ -583,15 +580,24 @@ max_treedepth <-  10
 n_chains <-  3
 n_cores <- 3
 n_thin <- 10
+np <- stan_data$np
+init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
+init_rec <- log(1e-06 + init_rec1$mean_dens*100)
 
-stan_model_fit2 <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
-                           init = list(list(log_mean_recruits = rep(log(1000), np),
+                           init = list(list(log_mean_recruits = init_rec, #rep(log(1000), np),
                                             theta_d = 1,
-                                           ssb0=1000000)),
+                                           ssb0=1000000),
+                                       list(log_mean_recruits = init_rec, #rep(log(1000), np),
+                                            theta_d = 1,
+                                            ssb0=1000000),
+                                       list(log_mean_recruits = init_rec, # rep(log(1000), np),
+                                            theta_d = 1,
+                                            ssb0=1000000)),
                        iter = total_iterations,
                        cores = n_cores,
                        refresh = 100,
@@ -601,10 +607,25 @@ stan_model_fit2 <- stan(file = here::here("src","process_sdm_based_on_20221003.s
                                       adapt_delta = 0.85)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221005a.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20221005a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221010d.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20221006b.rds"))
 # library(shinystan)
 # launch_shinystan(stan_model_fit)
+
+# examine rhats
+summary(stan_model_fit)$summary$Rhat
+
+post <- list(
+T_adjust = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
+T_adjust_proj = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
+Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
+width = rstan::extract(stan_model_fit, "width")$width,
+dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
+proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80,
+dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
+proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
+)
+saveRDS(post, "results/stan_model_posts_run20221006b.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
@@ -616,7 +637,7 @@ quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.
 
 # examine T_adjust (modeled and projected)
 test=apply(rstan::extract(stan_model_fit, "T_adjust")$T_adjust, c(2,3), median)
-plot(test[i,], ylim = c(0,1), type = "l")
+plot(test[1,], ylim = c(0,1), type = "l")
 for(i in 1:np){
   points(test[i,], ylim = c(0,1), type = "l")
 }

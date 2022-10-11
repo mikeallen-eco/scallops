@@ -49,7 +49,8 @@ data {
   
   matrix[n_ages, n_lbins] l_at_a_key;
   
-  vector[n_lbins] selectivity_at_bin;
+  // comment if manual_selectivity == 0
+  // vector[n_lbins] selectivity_at_bin;
   
   vector[n_ages] wt_at_age;
   
@@ -205,7 +206,7 @@ transformed parameters{
   vector[ny_train-1] rec_dev; // array of realized recruitment deviates, also now only 1/yr (it's a good or bad year everywhere)
   
   //commented while manual_selectivity==1
-  //vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
+  vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
   
   real surv[np, n_ages, ny_train];
   
@@ -256,7 +257,7 @@ transformed parameters{
   length_50_sel = loo * p_length_50_sel; // Dan made a note to change this sometime
   
   //commented while manual_selectivity==1
-  //selectivity_at_bin = 1.0 ./ (1 + exp(-log(19) * ((bin_mids - length_50_sel) / sel_delta))); // selectivity ogive at age
+  selectivity_at_bin = 1.0 ./ (1 + exp(-log(19) * ((bin_mids - length_50_sel) / sel_delta))); // selectivity ogive at age
   
   // mean_selectivity_at_age = length_at_age_key * selectivity_at_bin; // calculate mean selectivity at age given variance in length at age
   
@@ -558,8 +559,8 @@ generated quantities {
   matrix[np, n_lbins] proj_n_p_l_y_hat[ny_proj];
   real proj_dens_p_y_hat [np, ny_proj];
   real proj_dens_p_y_hat80 [np, ny_proj];
-  real proj_dens_p_y_hat80_lambda[np, ny_proj];
-  real dens_p_y_hat80_lambda[np, ny_train];
+  // real proj_dens_p_y_hat80_lambda[np, ny_proj];
+  // real dens_p_y_hat80_lambda[np, ny_train-1];
 
   if(run_forecast==1){
   for(p in 1:np){
@@ -576,7 +577,15 @@ generated quantities {
           surv_proj[a,y] = exp(-(f_proj[a,y] + m));
         }
         if(T_dep_mortality==1){
-          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_proj[p,y];
+          	if(y==1){
+
+	  surv_proj[a,1] = exp(-(f_proj[a,1] + m))* T_adjust[p,ny_train];
+
+	            } else {
+
+          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_proj[p,y-1];
+          
+	            } // close ifelse year==1 section within T_dep_mortality==1 section
 
         }
       }
@@ -643,26 +652,26 @@ generated quantities {
     }
   }
   
-  // to estimate projected annual population change
-  for(p in 1:np){
-    
-  proj_dens_p_y_hat80_lambda[p,1] = proj_dens_p_y_hat80[p,1] / proj_dens_p_y_hat[p,ny_train];
-
-  for(y in 2:(ny_proj)){
-
-  proj_dens_p_y_hat80_lambda[p,y] = proj_dens_p_y_hat80[p,y] / proj_dens_p_y_hat80[p,y-1];
-  
-    }
-  }
-  
-  // to estimate observed annual population change
-  for(p in 1:np){
-    for(y in 1:(ny_train-1)){
-
-  dens_p_y_hat80_lambda[p,y] = dens_p_y_hat80[p,y+1] / proj_dens_p_y_hat80[p,y];
-  
-    }
-  }
+  // // to estimate projected annual population change
+  // for(p in 1:np){
+  //   
+  // proj_dens_p_y_hat80_lambda[p,1] = proj_dens_p_y_hat80[p,1] / dens_p_y_hat[p,ny_train];
+  // 
+  // for(y in 2:(ny_proj)){
+  // 
+  // proj_dens_p_y_hat80_lambda[p,y] = proj_dens_p_y_hat80[p,y] / proj_dens_p_y_hat80[p,y-1];
+  // 
+  //   }
+  // }
+  // 
+  // // to estimate observed annual population change
+  // for(p in 1:np){
+  //   for(y in 1:(ny_train-1)){
+  // 
+  // dens_p_y_hat80_lambda[p,y] = dens_p_y_hat80[p,y+1] / dens_p_y_hat80[p,y];
+  // 
+  //   }
+  // }
     
 }
 
