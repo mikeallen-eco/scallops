@@ -160,7 +160,7 @@ parameters{
   
   real Topt; //  temp at which recruitment is maximized
   
-  real<lower = -1, upper = 1> alpha; // autocorrelation term
+  // real<lower = -1, upper = 1> alpha; // autocorrelation term
   
   //real  log_mean_recruits; // log mean recruits per patch, changed to one value for all space/time
   vector[np] log_mean_recruits; // patch-specific mean recruits
@@ -209,6 +209,8 @@ transformed parameters{
   vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
   
   real surv[np, n_ages, ny_train];
+  
+  real alpha = 0;
   
   //remove this if dispersal is not set to zero
   real d = 0;
@@ -265,16 +267,20 @@ transformed parameters{
   
   mean_recruits = exp(log_mean_recruits);
   
-  //print("mean recruits is ",mean_recruits);
+   print("mean recruits is ",mean_recruits);
   
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
     for(y in 1:ny_train){
       T_adjust[p,y] = T_dep(sbt[p,y], Topt, width);  
+      // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
+
     } // close years
   } // close patches
-  
-  
+
+  print("Topt is ",Topt);
+  print("width is ", width)
+
   // calculate total annual mortality from instantaneous natural + fishing mortality data 
   // note that z is the proportion that survive, 1-z is the proportion that die 
   
@@ -473,7 +479,7 @@ model {
   
   // log_sigma_r ~ normal(log(.5),.1); // process error prior
   
-  alpha ~ normal(0,.25); // autocorrelation prior
+  // alpha ~ normal(0,.25); // autocorrelation prior
   
   // uncomment this if d is estimated (not set at zero)
   //d ~ normal(0.1, 0.1); // dispersal rate as a proportion of total population size within the patch
@@ -600,9 +606,9 @@ generated quantities {
   // project pop dy
   for(y in 2:ny_proj){
     raw_proj[y] = normal_rng(0, sigma_r);
-    //  print("raw_proj in year ",y," is ",raw_proj[y]);
+      // print("raw_proj in year ",y," is ",raw_proj[y]);
     rec_dev_proj[y] = alpha * rec_dev_proj[y-1] + raw_proj[y];
-    //  print("rec_dev_proj in year ",y," is ",rec_dev_proj[y]);
+      // print("rec_dev_proj in year ",y," is ",rec_dev_proj[y]);
 
   }
 
@@ -674,5 +680,5 @@ generated quantities {
   // }
     
 }
-
 }
+

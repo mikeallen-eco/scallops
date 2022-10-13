@@ -44,7 +44,7 @@ max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
-use_custom_grid = 1
+use_custom_grid = 0
 custom_grid_vector = c("39.5-72.5", "39.5-73.5") # NULL # vector of grid names you want to include; NULL = none
 manual_selectivity = 1
 do_dirichlet = 1
@@ -568,13 +568,13 @@ stan_data <- list(
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221011a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221011a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
 
-warmups <- 400
-total_iterations <- 500
+warmups <- 500
+total_iterations <- 600
 max_treedepth <-  10
-n_chains <- 2
-n_cores <- 2
+n_chains <- 1
+n_cores <- 1
 n_thin <- 1
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
@@ -585,23 +585,43 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
-                           init = list(list(log_mean_recruits = init_rec, #rep(log(1000), np),
-                                            theta_d = 1,
-                                           ssb0=1000000),
-                                       list(log_mean_recruits = init_rec, #rep(log(1000), np),
-                                            theta_d = 1,
-                                            ssb0=1000000)),
+                       init = list(list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                        Topt = 9,
+                                        width = 3,
+                                        ssb0=1000000)),
                        iter = total_iterations,
                        cores = n_cores,
-                       refresh = 100,
+                       refresh = 10,
                        save_warmup = F,
                        save_dso = F,
                        control = list(max_treedepth = max_treedepth,
-                                      adapt_delta = 0.85)
+                                      adapt_delta = 0.999)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221011a.rds"))
-stan_model_fit <- readRDS(here("results","stan_model_fit_run20221011a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221013a.rds"))
+stan_model_fit <- readRDS(here("results","stan_model_fit_run20221012a.rds"))
+
+# assess how many divergent transistions in each chain
+sp <- get_sampler_params(stan_model_fit, inc_warmup = F)
+sum(sp[[1]][,"divergent__"])
+sum(sp[[2]][,"divergent__"])
+sum(sp[[3]][,"divergent__"])
+rm(sp)
+
+# look at summaries of parameters
+s_Topt <- summary(stan_model_fit, pars = c("Topt", "width"))
+s_Topt$summary
+rm(s_Topt)
+
+# estimated density of >80mm scallops
+s_dens80 <- summary(stan_model_fit, pars = c("dens_p_y_hat80"))
+s_dens80$summary
+summary(s_dens80$summary[,"Rhat"])
+
+# projected density of >80mm scallops
+s_proj_dens80 <- summary(stan_model_fit, pars = c("dens_p_y_hat80"))
+s_proj_dens80$summary
+summary(s_proj_dens80$summary[,"Rhat"])
 
 bayesplot::mcmc_pairs(stan_model_fit)
 
@@ -617,14 +637,15 @@ T_adjust_proj = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
 Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
 width = rstan::extract(stan_model_fit, "width")$width,
 dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
-proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80,
-dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
-proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
+proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
+# dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
+# proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221006b.rds")
+saveRDS(post, "results/stan_model_posts_run20221012a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
+apply(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))
 quantile(rstan::extract(stan_model_fit, "sigma_r")$sigma_r, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "sigma_obs")$sigma_obs, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "beta_obs")$beta_obs, c(0.025, 0.5, 0.975))
