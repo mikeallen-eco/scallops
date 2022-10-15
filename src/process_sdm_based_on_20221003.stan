@@ -267,7 +267,7 @@ transformed parameters{
   
   mean_recruits = exp(log_mean_recruits);
   
-   print("mean recruits is ",mean_recruits);
+   // print("mean recruits is ",mean_recruits);
   
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
@@ -278,8 +278,8 @@ transformed parameters{
     } // close years
   } // close patches
 
-  print("Topt is ",Topt);
-  print("width is ", width)
+  // print("Topt is ",Topt);
+  // print("width is ", width)
 
   // calculate total annual mortality from instantaneous natural + fishing mortality data 
   // note that z is the proportion that survive, 1-z is the proportion that die 

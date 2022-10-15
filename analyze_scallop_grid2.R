@@ -568,17 +568,17 @@ stan_data <- list(
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221011a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221011a.rds"))
 
-warmups <- 500
-total_iterations <- 600
+warmups <- 2000
+total_iterations <- 4000
 max_treedepth <-  10
-n_chains <- 1
-n_cores <- 1
-n_thin <- 1
+n_chains <- 3
+n_cores <- 3
+n_thin <- 10
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
-init_rec <- log(1e-06 + init_rec1$mean_dens*100)
+init_rec <- log(1e-02 + init_rec1$mean_dens*100)
 
 stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
                        data = stan_data,
@@ -588,10 +588,18 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                        init = list(list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
                                         Topt = 9,
                                         width = 3,
-                                        ssb0=1000000)),
+                                        ssb0=1000000),
+                                   list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                       Topt = 9,
+                                       width = 3,
+                                       ssb0=1000000),
+                                   list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                       Topt = 9,
+                                       width = 3,
+                                       ssb0=1000000)),
                        iter = total_iterations,
                        cores = n_cores,
-                       refresh = 10,
+                       refresh = 100,
                        save_warmup = F,
                        save_dso = F,
                        control = list(max_treedepth = max_treedepth,
@@ -601,7 +609,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
 saveRDS(stan_model_fit, here("results","stan_model_fit_run20221013a.rds"))
 stan_model_fit <- readRDS(here("results","stan_model_fit_run20221012a.rds"))
 
-# assess how many divergent transistions in each chain
+# assess how many divergent transitions in each chain
 sp <- get_sampler_params(stan_model_fit, inc_warmup = F)
 sum(sp[[1]][,"divergent__"])
 sum(sp[[2]][,"divergent__"])
@@ -641,7 +649,7 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221012a.rds")
+saveRDS(post, "results/stan_model_posts_run20221013a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
