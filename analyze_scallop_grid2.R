@@ -44,13 +44,14 @@ max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
-use_custom_grid = 0
-custom_grid_vector = c("39.5-72.5", "39.5-73.5") # NULL # vector of grid names you want to include; NULL = none
+use_custom_grid = 1
+custom_grid_vector = c("39.5-72.5", "39.5-73.5", "39.5-74.5",
+                       "38.5-73.5", "38.5-74.5") # NULL # vector of grid names you want to include; NULL = none
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # 
-T_dep_recruitment = 1 #
+T_dep_mortality = 1 # 
+T_dep_recruitment = 0 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
@@ -567,54 +568,90 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221011a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221018b.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221011a.rds"))
 
-warmups <- 2000
-total_iterations <- 4000
+warmups <- 1000
+total_iterations <- 2000
 max_treedepth <-  10
 n_chains <- 3
 n_cores <- 3
-n_thin <- 10
+n_thin <- 3
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
 init_rec <- log(1e-02 + init_rec1$mean_dens*100)
+lmr_tmp <- log(c(2186.86, 9.619022e+01, 10266.576,   8647.892, 107679.41,  
+                  6283.6557, 184734.28,  39878.84, 3.586360e+01, 561835.3,  55152.42, 
+                  1559.0693, 103983.98, 20103.271, 20016.272,  3582.938, 25941.33, 
+                  106389.67, 11440.285, 8871.597, 240107.9, 12090.136, 10043.986, 12119.523,
+                  7966.442, 10022.101,  9412.635,  377.90775, 1747.2184, 14141.341,
+                  7697.897,  695.8220,  8918.266, 14240.83, 15466.216, 4282.202, 9164.165))
+raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825, 
+             -0.69553989327405, 0.00387385992451144, -0.175824074445246, 0.160430833669419, 
+             0.422539284632822, -0.166649485677969, 0.863899307619138, 0.042304469919741, 
+             0.421033238400987, 0.602614757775617, 0.0587202896797734, 0.360573368807022, 
+             -0.32918472679931, -0.360798806715211, -0.547949986471929, 0.466673285376792, 
+             1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
+             -0.571006916717912, 0.241794514756976)
 
 stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
-                       init = list(list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                       init = list(list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
                                         Topt = 9,
                                         width = 3,
+                                        sigma_obs = 1.58,
+                                        sigma_r = 0.70,
+                                        beta_obs = 1.126561e-04,
+                                        theta_d = 0.5040393,
+                                        p_length_50_sel = 0.2226511,
+                                        raw = raw_tmp,
                                         ssb0=1000000),
-                                   list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                       Topt = 9,
-                                       width = 3,
-                                       ssb0=1000000),
-                                   list(log_mean_recruits = init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                       Topt = 9,
-                                       width = 3,
-                                       ssb0=1000000)),
+                                   list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                        Topt = 9,
+                                        width = 3,
+                                        sigma_obs = 1.58,
+                                        sigma_r = 0.70,
+                                        beta_obs = 1.126561e-04,
+                                        theta_d = 0.5040393,
+                                        p_length_50_sel = 0.2226511,
+                                        raw = raw_tmp,
+                                        ssb0=1000000),
+                                   list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                        Topt = 9,
+                                        width = 3,
+                                        sigma_obs = 1.58,
+                                        sigma_r = 0.70,
+                                        beta_obs = 1.126561e-04,
+                                        theta_d = 0.5040393,
+                                        p_length_50_sel = 0.2226511,
+                                        raw = raw_tmp,
+                                        ssb0=1000000)),
                        iter = total_iterations,
                        cores = n_cores,
-                       refresh = 100,
+                       refresh = 10,
                        save_warmup = F,
-                       save_dso = F,
+                       # save_dso = F,
                        control = list(max_treedepth = max_treedepth,
-                                      adapt_delta = 0.999)
+                                      adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221013a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221018a.rds"))
 stan_model_fit <- readRDS(here("results","stan_model_fit_run20221012a.rds"))
 
 # assess how many divergent transitions in each chain
+# check_rhat(stan_model_fit)
 sp <- get_sampler_params(stan_model_fit, inc_warmup = F)
 sum(sp[[1]][,"divergent__"])
 sum(sp[[2]][,"divergent__"])
 sum(sp[[3]][,"divergent__"])
 rm(sp)
+
+# pairs
+pairs(stan_model_fit,
+      pars = c("Topt", "width", "beta_obs", "sigma_r", "sigma_obs"))
 
 # look at summaries of parameters
 s_Topt <- summary(stan_model_fit, pars = c("Topt", "width"))
@@ -649,7 +686,7 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221013a.rds")
+saveRDS(post, "results/stan_model_posts_run20221018a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
@@ -659,6 +696,7 @@ quantile(rstan::extract(stan_model_fit, "sigma_obs")$sigma_obs, c(0.025, 0.5, 0.
 quantile(rstan::extract(stan_model_fit, "beta_obs")$beta_obs, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "theta_d")$theta_d, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.025, 0.5, 0.975))
+apply(rstan::extract(stan_model_fit, "raw")$raw, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))[2,]
 
 # examine T_adjust (modeled and projected)
 test=apply(rstan::extract(stan_model_fit, "T_adjust")$T_adjust, c(2,3), median)

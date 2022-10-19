@@ -263,11 +263,13 @@ transformed parameters{
   
   // mean_selectivity_at_age = length_at_age_key * selectivity_at_bin; // calculate mean selectivity at age given variance in length at age
   
-  //  print("mean selectivity at age is ",mean_selectivity_at_age); // check that counts are different for every year
+   // print("mean selectivity at age is ",mean_selectivity_at_age); // check that counts are different for every year
   
   mean_recruits = exp(log_mean_recruits);
   
-   // print("mean recruits is ",mean_recruits);
+   // print("mean recruits is ", mean_recruits);
+   // print("sigma_obs is ", sigma_obs);
+   // print("sigma_r is ", sigma_r);
   
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
@@ -452,19 +454,18 @@ model {
   
   real test;
   
-  beta_obs ~ normal(0.05,0.1); 
+  beta_obs ~ normal(0.05,0.1); // 
   
   // theta ~ uniform(0, 1); // Bernoulli probability of encounter
-  
-  
+
   // log_f ~ normal(log(m / 2),.5);
   
   if(spawner_recruit_relationship==0){
     raw ~ normal(0, sigma_r);
-    sigma_r ~ normal(.7,.2);
+    sigma_r ~ normal(.7,.2); 
     
     for(i in 1:np){
-    log_mean_recruits[i] ~ normal(7,5);
+    log_mean_recruits[i] ~ normal(7,3); // sd was 5
     }
   }
   
@@ -473,9 +474,9 @@ model {
     log_r0 ~ normal(15,5);
   }
   
-  Topt ~ normal(9, 9);
+  Topt ~ normal(9, 3); // sd was 5
   
-  width ~ normal(4, 4); 
+  width ~ normal(4, 2); 
   
   // log_sigma_r ~ normal(log(.5),.1); // process error prior
   
@@ -489,15 +490,15 @@ model {
   // proc_ratio ~ beta(2,2);
   // 
   
-  sigma_obs ~ normal(0.1,.2);
+  sigma_obs ~ normal(0.1,.2); // uniform didn't help convergence
   
   // sigma_obs ~ normal(.1, .1); // think more about whether these numbers are reasonable
   
-  p_length_50_sel ~ normal(length_50_sel_guess/loo, .2);
+  p_length_50_sel ~ normal(length_50_sel_guess/loo, .5); // sd was .2
   
   // log_scalar ~ normal(log(2),1);
   
-  
+
   theta_d ~ normal(0.5,.1);
   
   
