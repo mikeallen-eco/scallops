@@ -156,7 +156,7 @@ parameters{
   
   real<lower = 1e-3> sigma_obs;
   
-  real<lower=1e-6> width; // sensitivity to temperature variation ( was bounded at 1e-3)
+  real<lower=1e-3> width; // sensitivity to temperature variation
   
   real Topt; //  temp at which recruitment is maximized
   
