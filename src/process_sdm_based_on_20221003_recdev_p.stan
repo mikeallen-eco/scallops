@@ -156,7 +156,7 @@ parameters{
   
   real<lower = 1e-3> sigma_obs;
   
-  real<lower=1e-6> width; // sensitivity to temperature variation ( was bounded at 1e-3)
+  real<lower=1e-3> width; // sensitivity to temperature variation
   
   real Topt; //  temp at which recruitment is maximized
   
@@ -165,7 +165,7 @@ parameters{
   //real  log_mean_recruits; // log mean recruits per patch, changed to one value for all space/time
   vector[np] log_mean_recruits; // patch-specific mean recruits
 
-  vector[ny_train] raw; // array of raw recruitment deviates, changed to one value per year
+  real raw[np, ny_train]; // array of raw recruitment deviates, changed to one value per patch per year
   
   real<upper = 0.8> p_length_50_sel; // length at 50% selectivity
   
@@ -203,7 +203,7 @@ transformed parameters{
   
   real dens_p_y_hat80 [np, ny_train]; // for tracking sum density >= 80 mm
 
-  vector[ny_train-1] rec_dev; // array of realized recruitment deviates, also now only 1/yr (it's a good or bad year everywhere)
+  real rec_dev [np, ny_train-1]; // array of realized recruitment deviates, also now only 1/yr (it's a good or bad year everywhere)
   
   //commented while manual_selectivity==1
   vector[n_lbins] selectivity_at_bin; // mean selectivity at length bin midpoint
@@ -267,9 +267,9 @@ transformed parameters{
   
   mean_recruits = exp(log_mean_recruits);
   
-   // print("mean recruits is ", mean_recruits);
-   // print("sigma_obs is ", sigma_obs);
-   // print("sigma_r is ", sigma_r);
+   print("mean recruits is ", mean_recruits);
+   print("sigma_obs is ", sigma_obs);
+   print("sigma_r is ", sigma_r);
   
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
@@ -280,8 +280,8 @@ transformed parameters{
     } // close years
   } // close patches
 
-  // print("Topt is ",Topt);
-  // print("width is ", width)
+  print("Topt is ",Topt);
+  print("width is ", width)
 
   // calculate total annual mortality from instantaneous natural + fishing mortality data 
   // note that z is the proportion that survive, 1-z is the proportion that die 
@@ -310,11 +310,11 @@ transformed parameters{
 
         if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
           //n_p_a_y_hat[p,a,1] = mean_recruits * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
-          n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust[p,1] * exp(raw[p,1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
         }
         if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
           //n_p_a_y_hat[p,a,1] = mean_recruits * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
-          n_p_a_y_hat[p,a,1] = mean_recruits[p] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          n_p_a_y_hat[p,a,1] = mean_recruits[p] * exp(raw[p,1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
         }
         if(T_dep_recruitment==0 && spawner_recruit_relationship==1){
           n_p_a_y_hat[p,a,1] = r0 * 0.1; // scale it down a bit -- historical fishing was still occurring
@@ -328,36 +328,34 @@ transformed parameters{
       }
       
     } // close ages
-  } // close patches
+
   
-  
-  // calculate recruitment deviates every year (not patch-specific)
+  // calculate recruitment deviates every year (patch-specific)
   for (y in 2:ny_train){
     
     if(spawner_recruit_relationship==0){
       if (y == 2){ 
-        rec_dev[y-1]  =  raw[y]; // initialize first year of rec_dev with raw (process error) -- now not patch-specific
+        rec_dev[p, y-1]  =  raw[p,y]; // initialize first year of rec_dev with raw (process error) -- now not patch-specific
         // need to fix this awkward burn in
       } // close y==2 case  
       else {
         
-        rec_dev[y-1] =  alpha * rec_dev[y-2] + raw[y]; // why does rec_dev[y-1] use raw[y]? 
+        rec_dev[p, y-1] =  alpha * rec_dev[p, y-2] + raw[p,y]; // why does rec_dev[y-1] use raw[y]? 
         
       } // close ifelse
     }
     
     // describe population dynamics
-    for(p in 1:np){
-      
+
       // density-independent, temperature-dependent recruitment of age 1
       
       if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
         //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
-        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
+        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[p, y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
       }
       if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
         //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
-        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
+        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[p, y-1] - pow(sigma_r,2)/2) ;
       }
       
       if(T_dep_recruitment==0 && spawner_recruit_relationship==1){
@@ -461,10 +459,10 @@ model {
   // log_f ~ normal(log(m / 2),.5);
   
   if(spawner_recruit_relationship==0){
-    raw ~ normal(0, sigma_r);
     sigma_r ~ normal(.7,.2); 
     
     for(i in 1:np){
+    raw[i,] ~ normal(0, sigma_r);
     log_mean_recruits[i] ~ normal(7,3); // sd was 5
     }
   }
@@ -560,8 +558,8 @@ model {
 generated quantities {
   real proj_n_p_a_y_hat[np, n_ages, ny_proj+1];
   real T_adjust_proj[np, ny_proj];
-  vector[ny_proj] rec_dev_proj;
-  vector[ny_proj] raw_proj;
+  real rec_dev_proj [np, ny_proj];
+  real raw_proj [np, ny_proj];
   real surv_proj[n_ages, (ny_proj+1)];
   matrix[np, n_lbins] proj_n_p_l_y_hat[ny_proj];
   real proj_dens_p_y_hat [np, ny_proj];
@@ -597,30 +595,30 @@ generated quantities {
         }
       }
     }
-  }
+//  } // close patches
 
   // initialize with final year of our model
   proj_n_p_a_y_hat[,,1] = n_p_a_y_hat[,,ny_train];
-  rec_dev_proj[1] = rec_dev[ny_train-1];
-  raw_proj[1] = raw[ny_train];
+  rec_dev_proj[,1] = rec_dev[,ny_train-1];
+  raw_proj[,1] = raw[,ny_train];
 
   // project pop dy
   for(y in 2:ny_proj){
-    raw_proj[y] = normal_rng(0, sigma_r);
+    raw_proj[p, y] = normal_rng(0, sigma_r);
       // print("raw_proj in year ",y," is ",raw_proj[y]);
-    rec_dev_proj[y] = alpha * rec_dev_proj[y-1] + raw_proj[y];
+    rec_dev_proj[p, y] = alpha * rec_dev_proj[p, y-1] + raw_proj[p,y];
       // print("rec_dev_proj in year ",y," is ",rec_dev_proj[y]);
 
   }
 
   for(y in 2:(ny_proj+1)){
-    for(p in 1:np){
+//    for(p in 1:np){
 
       if(T_dep_recruitment==1){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[p,y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
       }
       if(T_dep_recruitment==0){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2);
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[p,y-1] - pow(sigma_r,2)/2);
       }
 
       if(age_at_maturity > 1){
@@ -682,4 +680,3 @@ generated quantities {
     
 }
 }
-

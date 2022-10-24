@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20221010b"
+# plotsave <- "results/run20221010b"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -44,18 +44,18 @@ max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
-use_custom_grid = 1
+use_custom_grid = 0
 custom_grid_vector = c("39.5-72.5", "39.5-73.5", "39.5-74.5",
                        "38.5-73.5", "38.5-74.5") # NULL # vector of grid names you want to include; NULL = none
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 1 # 
-T_dep_recruitment = 0 #
+T_dep_mortality = 0 # 
+T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
-btemp_meas <- "mean" # "min", "mean", or "max"
+btemp_meas <- "mean" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -202,6 +202,12 @@ if(btemp_meas == "max"){
     rename(climvar = max_temp)
 }
 
+if(btemp_meas == "O2"){
+  clim_avg <- clim_avg %>%
+    select(grid, year, O2) %>%
+    rename(climvar = O2)
+}
+
 # prep dat dens data
 dat_dens <- dat %>% 
   group_by(haulid, grid, patch, year, btemp) %>% 
@@ -217,7 +223,7 @@ dat_dens <- dat %>%
 
 # prep dat dens data, excluding smaller scallops (< 80 mm)
 dat_dens80 <- dat %>% 
-  filter(length >= 8) %>%
+  filter(is.na(length) | length >= 8) %>%
   group_by(haulid, grid, patch, year, btemp) %>% 
   summarise(dens = sum(number_at_length, na.rm = F),
             .groups = "drop") %>% # get total no. scallops in each haul, of any size
@@ -564,19 +570,19 @@ stan_data <- list(
   do_dirichlet = do_dirichlet,
   eval_l_comps = eval_l_comps, # evaluate length composition data? 0=no, 1=yes
   T_dep_mortality = T_dep_mortality, 
-  T_dep_recruitment = T_dep_recruitment, # think carefully before making more than one of the temperature dependencies true
+  T_dep_recruitment = T_dep_recruitment, # 
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221018b.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221011a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221018b.rds"))
 
-warmups <- 1000
-total_iterations <- 2000
+warmups <- 100
+total_iterations <- 110
 max_treedepth <-  10
-n_chains <- 3
-n_cores <- 3
-n_thin <- 3
+n_chains <- 1
+n_cores <- 1
+n_thin <- 1
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
 init_rec <- log(1e-02 + init_rec1$mean_dens*100)
@@ -594,41 +600,42 @@ raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825,
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"), # check that it's the right model!
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_recdev_p.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
-                       init = list(list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                        Topt = 9,
-                                        width = 3,
-                                        sigma_obs = 1.58,
-                                        sigma_r = 0.70,
-                                        beta_obs = 1.126561e-04,
-                                        theta_d = 0.5040393,
-                                        p_length_50_sel = 0.2226511,
-                                        raw = raw_tmp,
-                                        ssb0=1000000),
-                                   list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                        Topt = 9,
-                                        width = 3,
-                                        sigma_obs = 1.58,
-                                        sigma_r = 0.70,
-                                        beta_obs = 1.126561e-04,
-                                        theta_d = 0.5040393,
-                                        p_length_50_sel = 0.2226511,
-                                        raw = raw_tmp,
-                                        ssb0=1000000),
-                                   list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                        Topt = 9,
-                                        width = 3,
-                                        sigma_obs = 1.58,
-                                        sigma_r = 0.70,
-                                        beta_obs = 1.126561e-04,
-                                        theta_d = 0.5040393,
-                                        p_length_50_sel = 0.2226511,
-                                        raw = raw_tmp,
-                                        ssb0=1000000)),
+                       # init = list(list(#log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                        # Topt = 9,
+                                        # width = 3,
+                                        # sigma_obs = 1.58,
+                                        # sigma_r = 0.70,
+                                        # beta_obs = 1.126561e-04,
+                                        # theta_d = 0.5040393,
+                                        # p_length_50_sel = 0.2226511,
+                                        # raw = matrix(0.2,np, ny), # raw = raw_tmp,
+                                        # ssb0=1000000)#,
+                                   # list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                   #      Topt = 0.00025, #9,
+                                   #      width = 0.0001, #3,
+                                   #      sigma_obs = 1.58,
+                                   #      sigma_r = 0.70,
+                                   #      beta_obs = 1.126561e-04,
+                                   #      theta_d = 0.5040393,
+                                   #      p_length_50_sel = 0.2226511,
+                                   #      raw = raw_tmp,
+                                   #      ssb0=1000000),
+                                   # list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
+                                   #      Topt = 9,
+                                   #      width = 3,
+                                   #      sigma_obs = 1.58,
+                                   #      sigma_r = 0.70,
+                                   #      beta_obs = 1.126561e-04,
+                                   #      theta_d = 0.5040393,
+                                   #      p_length_50_sel = 0.2226511,
+                                   #      raw = raw_tmp,
+                                   #      ssb0=1000000)
+                                   # ),
                        iter = total_iterations,
                        cores = n_cores,
                        refresh = 10,
@@ -638,7 +645,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221018a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221019e.rds"))
 stan_model_fit <- readRDS(here("results","stan_model_fit_run20221012a.rds"))
 
 # assess how many divergent transitions in each chain
@@ -686,7 +693,7 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221018a.rds")
+saveRDS(post, "results/stan_model_posts_run20221019e.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
