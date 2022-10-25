@@ -1,0 +1,382 @@
+---
+title: "Scallop Dynamic Occupancy"
+author: "Mike Allen"
+date: '2022-10-19'
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# read and format in climate data
+clim_avg <- read.csv("processed-data/climate_formatted.csv") %>%
+    mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
+                                  grid_lat-0.25,
+                                substr(grid_lat,4,5)=="25" ~
+                                  grid_lat+0.25),
+           grid_lon = case_when(substr(grid_lon,5,6)=="75" ~
+                                  grid_lon+0.25,
+                                substr(grid_lon,5,6)=="25" ~
+                                  grid_lon-0.25),
+           grid = paste0(grid_lat,grid_lon)) %>%
+    group_by(grid, year) %>%
+    summarise(across(where(is.numeric), mean),
+              .groups = "drop")
+
+# prep dat dens data, excluding smaller scallops (< 80 mm)
+# note: "dat" here must be created in analyze_scallop_grid2.R first
+dat_dens80_occ <- dat %>% 
+  filter(is.na(length) | length >= 8) %>%
+  group_by(haulid, grid, patch, year) %>% 
+  summarise(dens = sum(number_at_length, na.rm = F),
+            .groups = "drop") %>%
+  arrange(patch, grid, year, haulid) %>%
+  group_by(grid, patch, year) %>%
+  summarise(pres = sum(dens>0, na.rm = T),
+            n = sum(haulid!="temp"),
+            .groups = "drop") %>%
+  mutate(pres = as.numeric(ifelse(n==0, NA, pres))) %>%
+  left_join(clim_avg, by = c("grid", "year"))
+
+dat_train_dens80_occ <- dat_dens80_occ %>% 
+  filter(year %in% train_years)  
+
+ymat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = pres) %>%
+  select(-grid) %>%
+  as.matrix()
+
+nmat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = n) %>%
+  select(-grid) %>%
+  as.matrix()
+
+meansbt_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+maxsbt_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = max_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+o2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = O2) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+
+```
+# Plot relationship between % present and climate variable
+```{r}
+dat_train_dens80_occ %>% 
+  filter(n>=2) %>% 
+  ggplot(aes(x = mean_temp, y = pres/n,
+             color = O2)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "% of tows")
+
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  mutate(pct = pres/n) %>%
+  group_by(grid) %>%
+  summarize(
+    mean_temp = mean(mean_temp),
+    O2 = mean(O2),
+    pct = mean(pct),
+    pres = sum(pres),
+    n = sum(n),
+            .groups = "drop") %>%
+  ggplot(aes(x = mean_temp, y = O2,
+             color = pres/n)) + 
+  geom_point(size = 5) +
+  scale_color_viridis_c(option = "inferno")
+
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  ggplot(aes(x = mean_temp, y = O2,
+             color = pres/n)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno")
+
+```
+# Define the model (quadratic effect of climatic variable)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_quad.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt + bpsi*climvar[i, 1] + 
+          b2psi*climvar2[i, 1]
+    psi1[i] <- ilogit(lpsi1[i])
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1] + bphi*climvar[i, t-1] + 
+          b2phi*climvar2[i, t-1]
+      phi[i, t-1] <- ilogit(lphi[i, t-1])
+      lgam[i, t-1] <- lgamInt[t-1] + bgam*climvar[i, t-1] + 
+          b2gam*climvar2[i, t-1]
+      gamma[i, t-1] <- ilogit(lgam[i, t-1])
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  bpsi ~ dunif(-5,5)
+  bphi ~ dunif(-5,5)
+  bgam ~ dunif(-5,5)
+  b2psi ~ dunif(-5,5)
+  b2phi ~ dunif(-5,5)
+  b2gam ~ dunif(-5,5)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+}
+")
+```
+# Define the model (Gaussian effect of climatic variable)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_gaus.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  Topt2 ~ dnorm(8,16)
+  width2 ~ dnorm(5,10)
+  Topt3 ~ dnorm(8,16)
+  width3 ~ dnorm(5,10)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+}
+")
+```
+# Bundle data for JAGS - quadratic mean SBT model
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize the covariate
+meansbt_matS <- wiqid::standardize(meansbt_mat)
+
+jdata_meansbt <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, z = z, climvar = meansbt_matS,
+    climvar2 = meansbt_matS^2)
+str(jdata_meansbt)
+
+wanted <- c("psiInt", "phiInt", "gamInt", "p", "bpsi", "b2psi", "bphi", "b2phi", "bgam", "b2gam", "N", "gamma", "phi")
+
+# 10 mins
+( out_meansbt_quad <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
+                      "scripts/scal_dyn_occ_quad.txt",
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(out_meansbt_quad, "C:\\Users\\Mike\\Desktop\\scallop_dynocc_plots/out_meansbt_quad.rds")
+
+```
+# plot effects - quadratic mean SBT model
+```{r}
+plot(out_meansbt_quad$mean$N, type = "l")
+
+range(meansbt_mat)  #  3.983414 18.407284
+cx <- seq(4, 18.4, length=101)
+cxS <- wiqid::standardize2match(cx, meansbt_mat)
+cxS2 <- cxS^2
+
+params <- out_meansbt_quad$mean
+
+lpsix <- with(params, qlogis(psiInt) + bpsi * cxS + b2psi*cxS2)
+psix <- plogis(lpsix)
+plot(cx, psix, type='l', lwd=2,
+    xlab="Mean SBT", ylab="Initial occupancy, psi")
+
+lphix <- matrix(NA, 101, 37)
+for(i in 1:37) {
+  lphix[,i] <- with(params, qlogis(phiInt[i]) + bphi * cxS +
+                      b2phi * cxS2)
+phix <- plogis(lphix)
+matplot(cx, phix, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Persistence, phi")
+}
+
+lgamx <- matrix(NA, 101, 37)
+for(i in 1:37){
+  lgamx[,i] <- with(params, qlogis(gamInt[i]) + bgam * cxS +
+                      b2gam * cxS)
+gamx <- plogis(lgamx)
+matplot(cx, gamx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation, gamma")
+}
+
+ldiffx <- matrix(NA, 101, 37)
+for(i in 1:37){
+    lgamx[,i] <- with(params, qlogis(gamInt[i]) + bgam * cxS +
+                      b2gam * cxS)
+    lphix[,i] <- with(params, qlogis(phiInt[i]) + bphi * cxS +
+                      b2phi * cxS2)
+extx <- 1-plogis(lphix)
+gamx <- plogis(lgamx)
+diffx <- gamx - extx
+matplot(cx, diffx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation - Extinction")
+abline(h = 0, lty = 2)
+}
+```
+# Bundle data for JAGS - Gaussian mean SBT model
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize the covariate
+meansbt_matS <- wiqid::standardize(meansbt_mat)
+
+jdata_meansbt <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar = meansbt_mat, z = z, 
+    climvar2 = meansbt_matS^2)
+str(jdata_meansbt)
+
+wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi")
+
+# 10 mins
+( out_meansbt_gaus <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
+                      "scripts/scal_dyn_occ_gaus.txt",
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(out_meansbt_gaus, "C:\\Users\\Mike\\Desktop\\scallop_dynocc_plots/out_meansbt_gaus3.rds")
+
+```
+# plot effects - Gaussian mean SBT model
+```{r}
+out_meansbt_gaus <- readRDS(
+  "C:\\Users\\Mike\\Desktop\\scallop_dynocc_plots/out_meansbt_gaus3.rds")
+
+plot(out_meansbt_gaus$mean$N, type = "l")
+
+range(meansbt_mat)  #  3.983414 18.407284
+cx <- seq(4, 18.4, length=101)
+
+params <- out_meansbt_gaus$mean
+
+lpsix <- with(params, qlogis(psiInt))
+psix <- plogis(lpsix)*(exp(-0.5*((cx-params$Topt1)/params$width1)^2))
+plot(cx, psix, type='l', lwd=2,
+    xlab="Mean SBT", ylab="Initial occupancy, psi")
+
+lphix <- matrix(NA, 101, 37)
+for(i in 1:37) {
+  lphix[,i] <- with(params, qlogis(phiInt[i]))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+matplot(cx, phix, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Persistence, phi")
+}
+
+lgamx <- matrix(NA, 101, 37)
+for(i in 1:37){
+  lgamx[,i] <- with(params, qlogis(gamInt[i]))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+matplot(cx, gamx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation, gamma")
+}
+
+ldiffx <- matrix(NA, 101, 37)
+for(i in 1:37){
+    lgamx[,i] <- with(params, qlogis(gamInt[i]))
+    lphix[,i] <- with(params, qlogis(phiInt[i]))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+extx <- 1-phix
+diffx <- gamx - extx
+matplot(cx, diffx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation - Extinction")
+abline(h = 0, lty = 2)
+}
+```
+
+# Mapping mean Colonization - Extinction
+```{r}
+
+
+
+```
+
