@@ -133,6 +133,8 @@ ggplot() +
                        high = "firebrick", space = "Lab") +
   theme(text = element_text(size = 14),
         title = element_text(size = 12)) 
+ggsave("figures/rmean/projected_loglambda.png", 
+       height = 6, width = 6, dpi = 400)
 
 # get model predicted values from training set
 pred80_rmean_train <- cbind(apply(rmean$dens_p_y_hat80, 
@@ -244,6 +246,9 @@ obspred_rmean_change <- obspred_rmean_per1 %>%
         title = element_text(size = 12)) 
 )
 
+ggsave("figures/rmean/obsdens_per1.png", 
+       height = 6, width = 6, dpi = 400)
+
 # map scallop abundance per 2 (2005-2014)
 (obs80_per2_plot <- 
     ggplot() +
@@ -269,6 +274,9 @@ obspred_rmean_change <- obspred_rmean_per1 %>%
         title = element_text(size = 12)) 
 )
 
+ggsave("figures/rmean/obsdens_per2.png", 
+       height = 6, width = 6, dpi = 400)
+
 # map observed change in scallop abundance per 1-2
 (obs80_chg_plot <- 
     obspred_rmean_change %>%
@@ -286,7 +294,7 @@ obspred_rmean_change <- obspred_rmean_per1 %>%
         legend.text = element_text(size = 8)) +
   viridis::scale_color_viridis(option = "inferno") +
   labs(x = "", y = "", fill = "",
-       title = "Observed change in rel. abund.\nlog10(2005-2014 / 1995-2004)") + 
+       title = "Observed change in rel. abund.\nlog(2005-2014 / 1995-2004)") + 
   # scale_fill_viridis_c(option = "inferno") +
   scale_fill_gradient2(midpoint = 0,
                        low = "steelblue",
@@ -295,6 +303,9 @@ obspred_rmean_change <- obspred_rmean_per1 %>%
   theme(text = element_text(size = 14),
         title = element_text(size = 12, hjust = 0.5))
 )
+
+ggsave("figures/rmean/obsdens_change.png", 
+       height = 6, width = 6, dpi = 400)
 
 # map estimated change in scallop abundance per 1-2
 (est80_chg_plot <- 

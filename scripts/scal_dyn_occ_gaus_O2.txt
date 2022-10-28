@@ -2,14 +2,14 @@
 model{
   for(i in 1:nSites) {
     # biological process
-    lpsi1[i] <- lpsiInt
+    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
     psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
     z[i, 1] ~ dbern(psi1[i])
     for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1]
+      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2[i,t-1]
       phi[i, t-1] <-
         ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1]
+      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2[i,t-1]
       gamma[i, t-1] <- 
         ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
       z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
@@ -42,6 +42,9 @@ model{
   width2 ~ dnorm(5,10)
   Topt3 ~ dnorm(8,16)
   width3 ~ dnorm(5,10)
+  betapsiO2 ~ dnorm(0,5)
+  betaphiO2 ~ dnorm(0,5)
+  betagamO2 ~ dnorm(0,5)
 
   # Derived variable
   for(t in 1:nYears) {

@@ -87,7 +87,7 @@ hauls_df <- tlen %>%
 # hauls_drm_list[[i]] <- hauls_df_step1 %>%
 #   mutate(length = i,
 #          spp = "Placopecten magellanicus") %>%
-#   select(haulid, length, spp, btemp = bottemp, 
+#   select(haulid, length, spp, btemp = bottemp,
 #          year, month, lat, lon) %>%
 #   left_join(select(tlen,
 #                    haulid,

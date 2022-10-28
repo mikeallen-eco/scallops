@@ -160,7 +160,7 @@ sc1d_sf <- sc1d %>%
            crs = 4326)
 
 state_bounds <- ne_coastline(scale = 110, returnclass = "sf") %>%
-  st_crop(svlen_sum_sf)
+  st_crop(sc_sf)
 ```
 # Plot tows
 ```{r}

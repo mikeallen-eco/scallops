@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-plotsave <- "results/run20221024a"
+# plotsave <- "results/run20221024a"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")

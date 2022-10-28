@@ -27,6 +27,35 @@ clim_avg <- read.csv("processed-data/climate_formatted.csv") %>%
     summarise(across(where(is.numeric), mean),
               .groups = "drop")
 
+# covariate data from Morely
+clim_other <- readRDS("data_noaa/trawl/hauls.rds") %>%
+  filter(region %in% c("NEFSC_NEUS")) %>%
+  mutate(grid_lat = case_when(lat-trunc(lat)<0.5 ~ trunc(lat)+0.25,
+                              lat-trunc(lat)>=0.5 ~ 
+                                trunc(lat)+0.75),
+         grid_lon = case_when(abs(lon-trunc(lon))<0.5 ~ 
+                                trunc(lon)-0.25,
+                              abs(lon-trunc(lon))>=0.5 ~ 
+                                trunc(lon)-0.75),
+         grid = paste0(grid_lat,grid_lon)) %>%
+    mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
+                                  grid_lat-0.25,
+                                substr(grid_lat,4,5)=="25" ~
+                                  grid_lat+0.25),
+           grid_lon = case_when(substr(grid_lon,5,6)=="75" ~
+                                  grid_lon+0.25,
+                                substr(grid_lon,5,6)=="25" ~
+                                  grid_lon-0.25),
+           grid = paste0(grid_lat,grid_lon)) %>%
+    filter(grid %in% unique(clim_avg$grid),
+         year %in% unique(clim_avg$year),
+         month > 7) %>%
+    group_by(grid, year) %>%
+    summarise(across(where(is.numeric), mean, na.rm = T),
+              .groups = "drop") %>%
+  select(-latgrid, -longrid, -yearsurv, -lat, -lon, month) %>%
+  arrange(grid, year)
+
 # prep dat dens data, excluding smaller scallops (< 80 mm)
 # note: "dat" here must be created in analyze_scallop_grid2.R first
 dat_dens80_occ <- dat %>% 
@@ -40,10 +69,16 @@ dat_dens80_occ <- dat %>%
             n = sum(haulid!="temp"),
             .groups = "drop") %>%
   mutate(pres = as.numeric(ifelse(n==0, NA, pres))) %>%
-  left_join(clim_avg, by = c("grid", "year"))
+  left_join(clim_avg, by = c("grid", "year")) %>%
+  left_join(clim_other, by = c("grid", "year", 
+                               "grid_lat", "grid_lon")) %>%
+  filter(year != 1979)
 
 dat_train_dens80_occ <- dat_dens80_occ %>% 
-  filter(year %in% train_years)  
+  filter(year %in% train_years) 
+
+dat_test_dens80_occ <- dat_dens80_occ %>% 
+  filter(year %in% test_years) 
 
 ymat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
@@ -66,6 +101,20 @@ meansbt_mat <- dat_train_dens80_occ %>%
   select(-grid) %>%
   as.matrix() 
 
+meansbt_mat_test <- dat_test_dens80_occ %>%
+  select(grid, year, mean_temp) %>%
+  # need to do this because we want all years (even with no hauls)
+  # for prediction
+  right_join(expand.grid(grid = unique(dat_test_dens80_occ$grid),
+                         year = test_years)) %>%
+  left_join(clim_avg, by = c("grid", "year")) %>%
+  select(grid, year, mean_temp = mean_temp.y) %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
 maxsbt_mat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
               names_from = year,
@@ -80,10 +129,25 @@ o2_mat <- dat_train_dens80_occ %>%
   select(-grid) %>%
   as.matrix() 
 
-
+depth_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = depth) %>%
+  select(-grid) %>%
+  as.matrix()
 ```
-# Visualize the niche
+# plot scallop occ vs. mean SBT and O2
 ```{r}
+dat_train_dens80_occ %>% 
+  filter(n>=2) %>% 
+  ggplot(aes(x = mean_temp, y = pres/n,
+             color = depth)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "% of tows")
+# ggsave("figures/niche/occ_v_meanSBT_depth.png",
+       # height = 6, width = 6, dpi = 400)
+
 dat_train_dens80_occ %>% 
   filter(n>=2) %>% 
   ggplot(aes(x = mean_temp, y = pres/n,
@@ -91,21 +155,29 @@ dat_train_dens80_occ %>%
   geom_point(size = 3, alpha = .7) +
   scale_color_viridis_c(option = "inferno") +
   labs(y = "% of tows")
+# ggsave("figures/niche/occ_v_meanSBT_O2.png",
+#        height = 6, width = 6, dpi = 400)
 
-dat_train_dens80_occ %>% 
+meanplot <- dat_train_dens80_occ %>% 
   filter(n>=5) %>% 
   mutate(pct = pres/n) %>%
   group_by(grid) %>%
   summarize(
     mean_temp = mean(mean_temp),
     O2 = mean(O2),
+    depth = mean(depth),
     pct = mean(pct),
     pres = sum(pres),
     n = sum(n),
-            .groups = "drop") %>%
-  ggplot(aes(x = mean_temp, y = O2,
-             color = pres/n)) + 
+            .groups = "drop") 
+
+meanplot %>%
+  ggplot(aes(x = mean_temp, y = depth,
+             color = O2)) + 
   geom_point(size = 5) +
+  geom_point(data = filter(meanplot, pct>0.35),
+             aes(x = mean_temp, y = depth),
+             color = "black", fill = "red", size = 2, shape = 21) +
   scale_color_viridis_c(option = "inferno")
 
 dat_train_dens80_occ %>% 
@@ -170,6 +242,88 @@ model{
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
   
+  # Colonization - Extinction for test period
+  for(i in 1:nSites){
+  for(t in 1:10){ # years
+  gamma_proj[i, t] <-
+    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
+  phi_proj[i, t] <-
+    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
+  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
+  }
+  }
+  
+}
+")
+```
+# Define the model (Gaussian effect of SBT + monotonic effect of O2)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_gaus_O2.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2[i,t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2[i,t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  Topt2 ~ dnorm(8,16)
+  width2 ~ dnorm(5,10)
+  Topt3 ~ dnorm(8,16)
+  width3 ~ dnorm(5,10)
+  betapsiO2 ~ dnorm(0,5)
+  betaphiO2 ~ dnorm(0,5)
+  betagamO2 ~ dnorm(0,5)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+  # Colonization - Extinction for test period
+  for(i in 1:nSites){
+  for(t in 1:10){ # years
+  gamma_proj[i, t] <-
+    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
+  phi_proj[i, t] <-
+    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
+  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
+  }
+  }
+  
 }
 ")
 ```
@@ -179,27 +333,30 @@ model{
 z <- (ymat > 0)*1
 z[z == 0] <- NA
 
-# Standardize the covariate
-meansbt_matS <- wiqid::standardize(meansbt_mat)
+# Standardize covariates
+o2_matS <- wiqid::standardize(o2_mat)
 
 jdata_meansbt <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar = meansbt_mat, z = z, 
-    climvar2 = meansbt_matS^2)
+    n = nmat, climvar = meansbt_mat, z = z, O2 = o2_matS,
+    climvar_proj = meansbt_mat_test)
 str(jdata_meansbt)
 
 wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi")
+            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
+            "colminusext_proj", "betapsiO2", "betaphiO2", "betagamO2")
 
 # 10 mins
 ( out_meansbt_gaus <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
-                      "scripts/scal_dyn_occ_gaus.txt",
+                      "scripts/scal_dyn_occ_gaus_O2.txt",
+                      n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(out_meansbt_gaus, "output/out_meansbt_gaus3.rds")
+saveRDS(out_meansbt_gaus, "output/out_meansbt_gaus_O2.rds")
 ```
 # plot effects - Gaussian mean SBT model
 ```{r}
-out_meansbt_gaus <- readRDS("output/out_meansbt_gaus3.rds")
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
+# out_meansbt_gaus <- readRDS("output/out_meansbt_gaus_O2.rds")
 
 plot(out_meansbt_gaus$mean$N, type = "l")
 
@@ -242,6 +399,58 @@ matplot(cx, diffx, type='l', lty=1, lwd=2,
 abline(h = 0, lty = 2)
 }
 ```
+# Mapping mean Colonization - Extinction (test period)
+```{r}
+out <- readRDS("output/out_meansbt_gaus4.rds")
+
+colext_mat <- apply(out$sims.list$colminusext_proj, c(2,3), median)
+colext_mean <- apply(colext_mat, 1, mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1) %>%
+  mutate(grid = unique(dat_train_dens80_occ$grid)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext_mean)
+
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = colext),
+            # alpha = 1,
+            data = colext_mean,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  labs(x = "", y = "", fill = "Mean predicted\ncolonization - extinction rate\n(2005-2014)",
+       title = "Dynamic occupancy model\n(based on mean SBT)") + 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12))
+
+ggsave("figures/dynocc/projected_colext.png", 
+       height = 6, width = 6, dpi = 400)
+```
+
+
+# Map col-ext for training set for model with and without O2
+```{r}
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus_O2.rds")
+
+params$gamma-(1-params$phi)
+```
+
 # Mapping change in psi over time
 ```{r}
 # http://www.seec.uct.ac.za/dynamic-occupancy-models
@@ -251,11 +460,3 @@ psix <- params$psiInt*(exp(-0.5*((meansbt_mat[,1]-params$Topt1)/params$width1)^2
 phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
 gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
 ```
-
-# Mapping mean Colonization - Extinction
-```{r}
-
-
-
-```
-
