@@ -6,6 +6,7 @@ output: html_document
 ---
 
 # 1ST NEED TO LOAD dat_test_dens80 FROM analyze_scallop_grid2.R
+Note: these are very long chunks, each that visualizes output from a different model. good portions of each could be cut as they format and plot/map the same change in observed abundance in each chunk.
 
 # then load libraries and the model posteriors
 ```{r}
@@ -21,10 +22,10 @@ rmax <- readRDS("results/stan_model_posts_run20221019a.rds")
 mmax <- readRDS("results/stan_model_posts_run20221019b.rds") 
 rmin <- readRDS("results/stan_model_posts_run20221019c.rds") 
 mmin <- readRDS("results/stan_model_posts_run20221019d.rds") 
+null <- readRDS("results/stan_model_posts_run20221024a.rds") 
 ```
 # Rec vs. Mean SBT - change in 10 year mean pop. est, observed; also suitability
 ```{r}
-
 # Tdep rec vs. mean sbt
     # visualize observed vs. predicted projections of 80mm+ scallops
 
@@ -88,6 +89,65 @@ obspred_rmean %>%
 # ggsave("obspred_meanSBT_rec.png", 
        # height = 4, width = 6, dpi = 400)
 
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_rmean <- cbind(apply(rmean$dens_p_y_hat80, 
+                            c(2,3), median)) %>%
+    t() %>%
+    as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_rmean <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_rmean <- Tobs80_rmean %>%
+  full_join(Tpred80_rmean, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_rmean, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_rmean, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_rmean %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+  # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.772") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent recruitment (mean SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_meanSBT_rec_train.png",
+# height = 4, width = 6, dpi = 400)
+
 # Map mean projected growth rate over time
 obspred_rmean  %>%
   filter(year != 2004,
@@ -108,10 +168,12 @@ obspred_rmean_by_grid <- obspred_rmean  %>%
   sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
            crs = 4326)
 
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(obspred_rmean_by_grid)
+
 obspred_rmean_by_grid %>%
   ggplot(aes(x = loglambda)) +
   geom_boxplot()
-
 
 ggplot() +
   geom_tile(aes(x = lon, y = lat, fill = loglambda),
@@ -444,6 +506,65 @@ obspred_mmean %>%
 # ggsave("obspred_meanSBT_mort.png", 
        # height = 4, width = 6, dpi = 400)
 
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_mmean <- cbind(apply(mmean$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_mmean <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_mmean <- Tobs80_mmean %>%
+  full_join(Tpred80_mmean, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_mmean, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_mmean, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_mmean %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.772") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent mortality (mean SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_meanSBT_mort_train.png",
+# height = 4, width = 6, dpi = 400)
+
 # Map mean projected growth rate over time
 obspred_mmean  %>%
   filter(year != 2004,
@@ -469,6 +590,7 @@ obspred_mmean_by_grid %>%
   geom_boxplot()
 
 obspred_mmean_by_grid %>%
+  # remove 3 grid cells that never had any scallops
     filter(grid != "35.5-75.5",
            grid != "37.5-75.5",
            grid != "38.5-75.5") %>%
@@ -819,6 +941,65 @@ obspred_rmax %>%
 # ggsave("obspred_maxSBT_rec.png",
        # height = 4, width = 6, dpi = 400)
 
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_rmax <- cbind(apply(rmax$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_rmax <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_rmax <- Tobs80_rmax %>%
+  full_join(Tpred80_rmax, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_rmax, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_rmax, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_rmax %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.774") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent recruitment (max SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_maxSBT_rec_train.png",
+# height = 4, width = 6, dpi = 400)
+
 # Map mean projected growth rate over time
 obspred_rmax  %>%
   filter(year != 2004,
@@ -1132,8 +1313,7 @@ ggplot(obspred_rmax_change, aes(x = suit_chg,
        y = "Estimated change in rel. abund.") +
   theme_bw()
 ```
-
-# Recruitment vs. Max SBT - change in 10 year mean pop. est, observed; also suitability
+# Recruitment vs. Min SBT - change in 10 year mean pop. est, observed; also suitability
 ```{r}
 
 # Tdep rec vs. min sbt
@@ -1181,8 +1361,8 @@ obspred_rmin %>%
   geom_smooth(method = "lm", se = F,
               color = "black") +
   annotate("text", x = 500, y = 500, label = "Spearmans =\n0.746") +
-  labs(x = "Obs. 80mm+ scallops / trawl",
-       y = "Pred. 80mm+ scallops / trawl",
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
        color = "Year",
        title = "Temp.-dependent recruitment (min SBT)") +
   scale_y_log10(limits = c(1,1000),
@@ -1194,6 +1374,65 @@ obspred_rmin %>%
 
 # ggsave("obspred_minSBT_rec.png",
 # height = 4, width = 6, dpi = 400)
+
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_rmin <- cbind(apply(rmin$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_rmin <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_rmin <- Tobs80_rmin %>%
+  full_join(Tpred80_rmin, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_rmin, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_rmin, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_rmin %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.770") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent recruitment (min SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+ggsave("obspred_minSBT_rec_train.png",
+height = 4, width = 6, dpi = 400)
 
 # Map mean projected growth rate over time
 obspred_rmin  %>%
@@ -1556,8 +1795,8 @@ obspred_mmax %>%
   geom_smooth(method = "lm", se = F,
               color = "black") +
   annotate("text", x = 500, y = 500, label = "Spearmans =\n0.719") +
-  labs(x = "Obs. 80mm+ scallops / trawl",
-       y = "Pred. 80mm+ scallops / trawl",
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
        color = "Year",
        title = "Temp.-dependent mortality (max SBT)") +
   scale_y_log10(limits = c(1,1000),
@@ -1567,7 +1806,66 @@ obspred_mmax %>%
   theme_bw() +
   theme(text = element_text(size = 14)) 
 
-# ggsave("obspred_maxSBT_mort.png", 
+# ggsave("obspred_maxSBT_mort.png",
+# height = 4, width = 6, dpi = 400)
+
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_mmax <- cbind(apply(mmax$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_mmax <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_mmax <- Tobs80_mmax %>%
+  full_join(Tpred80_mmax, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_mmax, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_mmax, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_mmax %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.764") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent mortality (max SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_maxSBT_mort_train.png",
 # height = 4, width = 6, dpi = 400)
 
 # Map mean projected growth rate over time
@@ -1931,8 +2229,8 @@ obspred_mmin %>%
   geom_smooth(method = "lm", se = F,
               color = "black") +
   annotate("text", x = 500, y = 500, label = "Spearmans =\n0.734") +
-  labs(x = "Obs. 80mm+ scallops / trawl",
-       y = "Pred. 80mm+ scallops / trawl",
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
        color = "Year",
        title = "Temp.-dependent mortality (min SBT)") +
   scale_y_log10(limits = c(1,1000),
@@ -1943,6 +2241,65 @@ obspred_mmin %>%
   theme(text = element_text(size = 14)) 
 
 ggsave("obspred_minSBT_mort.png",
+height = 4, width = 6, dpi = 400)
+
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_mmin <- cbind(apply(mmin$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_mmin <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_mmin <- Tobs80_mmin %>%
+  full_join(Tpred80_mmin, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_mmin, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_mmin, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_mmin %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.768") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent mortality (min SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+ggsave("obspred_minSBT_mort_train.png",
 height = 4, width = 6, dpi = 400)
 
 # Map mean projected growth rate over time
@@ -2250,6 +2607,439 @@ ggplot(obspred_mmin_change, aes(x = suit_chg,
   theme_bw()
 
 ggplot(obspred_mmin_change, aes(x = suit_chg, 
+                                y = est80_chg)) +
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  geom_smooth(method = "lm", color = "black") +
+  labs(x = "Change in adult survival suitability based on min SBT",
+       y = "Estimated change in rel. abund.") +
+  theme_bw()
+```
+# Null - no SBT-dependent rectuitment or mortality - change in 10 year mean pop. est, observed; also suitability
+```{r}
+# no-Tdep mort or recruitment
+# visualize observed vs. predicted projections of 80mm+ scallops
+
+# apply medians
+pred80_null <- apply(null$proj_dens_p_y_hat80, c(2,3), median) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = 2004:2013) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+obs80_null <- dat_test_dens80 %>%
+  bind_rows(filter(dat_train_dens80, year == 25)) %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea) %>%
+  filter(year != 2014)
+
+obspred_null <- obs80_null %>%
+  full_join(pred80_null, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(obspred_null, is.na(obs80)==F)$obs80, 
+    filter(obspred_null, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+obspred_null %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.741") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent mortality (min SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_null.png",
+#        height = 4, width = 6, dpi = 400)
+
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_null <- cbind(apply(null$dens_p_y_hat80, 
+                            c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_null <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_null <- Tobs80_null %>%
+  full_join(Tpred80_null, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_null, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_null, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_null %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.770") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "No temp.-dependence") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+ggsave("obspred_null_train.png",
+       height = 4, width = 6, dpi = 400)
+
+# Map mean projected growth rate over time
+obspred_null  %>%
+  filter(year != 2004,
+         is.na(mean_dens)==F) %>%
+  ggplot(aes(x = grid, y = log(est_lambda))) +
+  geom_boxplot()
+
+obspred_null_by_grid <- obspred_null  %>%
+  filter(year != 2004,
+         is.na(mean_dens)==F) %>%
+  group_by(grid) %>%
+  summarize(loglambda = mean(log(est_lambda)),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+               crs = 4326)
+
+obspred_null_by_grid %>%
+  ggplot(aes(x = loglambda)) +
+  geom_boxplot()
+
+obspred_null_by_grid %>%
+  filter(grid != "35.5-75.5",
+         grid != "37.5-75.5",
+         grid != "38.5-75.5") %>%
+  ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = loglambda),
+            # alpha = 1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean growth rate\n(log lambda)\n(2005-2014)",
+       title = "Projected scallop pop. growth rate\n(no temperature dependence)") + 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+
+# get model-predicted values
+pred80_null_train <- cbind(apply(null$dens_p_y_hat80, 
+                                 c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = 1980:2004) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+obs80_null_train <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+obspred_null_train <- obs80_null_train %>%
+  full_join(pred80_null_train, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# check which cells have zero scallops always 
+# (35.5-75.5, 37.5-75.5, 38.5-75.5)
+test = obspred_null_train %>% 
+  group_by(grid) %>% 
+  summarize(presn = sum(obs80>0))
+test2 = obspred_null %>% 
+  group_by(grid) %>% 
+  summarize(presn = sum(obs80>0))
+
+# create period 1
+obspred_null_per1 <- obspred_null_train  %>%
+  filter(year %in% 1995:2004,
+         is.na(mean_dens)==F) %>%
+  mutate(suit = 
+           exp(-0.5 * ((climvar - 
+                          median(null$Topt))/median(null$width))^2)) %>%
+  group_by(grid) %>%
+  summarize(obs80_per1 = mean(obs80),
+            est80_per1 = mean(est80),
+            climvar_per1 = mean(climvar),
+            suit_per1 = mean(suit),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# create period 2
+obspred_null_per2 <- obspred_null  %>%
+  filter(year %in% 2005:2013,
+         is.na(grid)==F) %>%
+  mutate(suit = 
+           exp(-0.5 * ((climvar - 
+                          median(null$Topt))/median(null$width))^2)) %>%
+  group_by(grid) %>%
+  summarize(obs80_per2 = mean(obs80),
+            est80_per2 = mean(est80),
+            climvar_per2 = mean(climvar),
+            suit_per2 = mean(suit),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# combine period 1 and 2 change data
+obspred_null_change <- obspred_null_per1 %>%
+  st_join(obspred_null_per2) %>%
+  mutate(obs80_chg = log((obs80_per2+1)/(obs80_per1+1)),
+         est80_chg = log(est80_per2/est80_per1),
+         clim_chg = climvar_per2 - climvar_per1,
+         suit_chg = suit_per2 - suit_per1) %>%
+  select(grid=grid.x, obs80_per1, obs80_per2, obs80_chg,
+         est80_per1, est80_per2, est80_chg, clim_chg, 
+         suit_per1, suit_per2, suit_chg, 
+         lat=lat.x, lon=lon.x)
+
+# map scallop abundance per 1 (1995-2004)
+(obs80_per1_plot <- 
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_per1),
+              # alpha = 1,
+              data = obspred_null_change,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "value",
+         title = "") + 
+    scale_fill_viridis_c(option = "inferno") +
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12)) 
+)
+
+# map scallop abundance per 2 (2005-2014)
+(obs80_per2_plot <- 
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_per2),
+              # alpha = 1,
+              data = obspred_null_change,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "value",
+         title = "") + 
+    scale_fill_viridis_c(option = "inferno") +
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12)) 
+)
+
+# map observed change in scallop abundance per 1-2
+(obs80_chg_plot <- 
+    obspred_null_change %>%
+    filter(grid != "35.5-75.5",
+           grid != "37.5-75.5",
+           grid != "38.5-75.5") %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_chg),
+              # alpha = 1,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "",
+         title = "Observed change in rel. abund.\nlog(2005-2014 / 1995-2004)") + 
+    # scale_fill_viridis_c(option = "inferno") +
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+# map estimated change in scallop abundance per 1-2
+(est80_chg_plot <- 
+    obspred_null_change %>%
+    filter(grid != "35.5-75.5",
+           grid != "37.5-75.5",
+           grid != "38.5-75.5") %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = est80_chg),
+              # alpha = 1,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "",
+         title = "Estimated change in rel. abund.\nlog(2005-2014 / 1995-2004)") + 
+    # scale_fill_viridis_c(option = "inferno") +
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+# map change in suitability from per 1 to 2
+(est80_chg_plot <- 
+    obspred_null_change %>%
+    filter(grid != "35.5-75.5",
+           grid != "37.5-75.5",
+           grid != "38.5-75.5") %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = suit_chg),
+              # alpha = 1,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "",
+         title = "Estimated change in survival suitability\n(based on min SBT)") + 
+    # scale_fill_viridis_c(option = "inferno") +
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+ggplot(obspred_null_change, aes(x = obs80_per2+1, 
+                                y = est80_per2+1)) +
+  geom_point(size = 3,
+             alpha = .7) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_viridis_c(option = "inferno") +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  labs(y = "Estimated mean rel. abund. (projected, 2005-2014)",
+       x = "Observed mean rel. abund. (2005-2014)")
+
+cor(obspred_null_change$obs80_per2,
+    obspred_null_change$est80_per2,
+    method = "spearman") # 0.837
+
+ggplot(obspred_null_change) +
+  geom_point(size = 3,
+             alpha = .7, aes(x = obs80_chg, 
+                             y = est80_chg)) +
+  geom_smooth(aes(x = obs80_chg, 
+                  y = est80_chg), 
+              method = "lm", color = "black") +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "Estimated change in mean rel. abund.\nlog(2005-2014 / 1995-2004)",
+       x = "Observed change in mean rel. abund.\nlog(2005-2014 / 1995-2004)") +
+  theme_bw()
+
+ggplot(obspred_null_change, aes(x = suit_chg, 
+                                y = obs80_chg)) +
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  geom_smooth(method = "lm", color = "black") +
+  labs(x = "Change in adult survival suitability based on min SBT",
+       y = "Observed change in rel. abund.") +
+  theme_bw()
+
+ggplot(obspred_null_change, aes(x = suit_chg, 
                                 y = est80_chg)) +
   geom_point(size = 3, alpha = .7) +
   scale_color_viridis_c(option = "inferno") +

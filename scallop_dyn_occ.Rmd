@@ -446,9 +446,14 @@ ggsave("figures/dynocc/projected_colext.png",
 # Map col-ext for training set for model with and without O2
 ```{r}
 out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
-out_meansbt_gaus <- readRDS("output/out_meansbt_gaus_O2.rds")
+out_meansbt_gausO2 <- readRDS("output/out_meansbt_gaus_O2.rds")
+params_gaus <- out_meansbt_gaus$mean
+params_gausO2 <- out_meansbt_gausO2$mean
 
-params$gamma-(1-params$phi)
+colext_gaus <- params_gaus$gamma-(1-params_gaus$phi) %>%
+  apply(.,1,mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1)
 ```
 
 # Mapping change in psi over time
