@@ -45,11 +45,20 @@ lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
 use_custom_grid = 0
-custom_grid_vector = c("39.5-72.5", "39.5-73.5", "39.5-74.5",
-                       "38.5-73.5", "38.5-74.5") # NULL # vector of grid names you want to include; NULL = none
+# custom_grid_vector = c("39.5-72.5", "39.5-73.5", "39.5-74.5",
+                       # "38.5-73.5", "38.5-74.5") # NULL # vector of grid names you want to include; NULL = none
+custom_grid_vector = c("35.5-74.5", "36.5-74.5", "36.5-75.5", "37.5-74.5", 
+                       "38.5-73.5", "38.5-74.5", "39.5-72.5", 
+                       "39.5-73.5", "39.5-74.5", "40.5-67.5", "40.5-68.5", "40.5-69.5", 
+                       "40.5-70.5", "40.5-71.5", "40.5-72.5", "40.5-73.5", "41.5-65.5", 
+                       "41.5-66.5", "41.5-67.5", "41.5-68.5", "41.5-69.5", "41.5-70.5", 
+                       "42.5-66.5", "42.5-67.5", "42.5-68.5", "42.5-69.5", "42.5-70.5", 
+                       "43.5-66.5", "43.5-67.5", "43.5-68.5", "43.5-69.5", "43.5-70.5", 
+                       "44.5-66.5", "44.5-67.5")
+
 manual_selectivity = 1
 do_dirichlet = 1
-eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
+eval_l_comps = 1 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 0 # 
 T_dep_recruitment = 0 #
 spawner_recruit_relationship = 0
@@ -574,8 +583,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221024a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221024a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221031a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
 
 warmups <- 1000
 total_iterations <- 2000
@@ -645,7 +654,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221024a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221031a.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221024a.rds"))
 
 # assess how many divergent transitions in each chain
@@ -693,7 +702,7 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221024a.rds")
+saveRDS(post, "results/stan_model_posts_run20221031a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
