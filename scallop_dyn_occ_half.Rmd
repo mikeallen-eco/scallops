@@ -1,0 +1,534 @@
+---
+title: "Scallop Dynamic Occupancy - half degree"
+author: "Mike Allen"
+date: '2022-11-2'
+output: html_document
+---
+
+# Load libraries and format data
+Note: the "dat" object in this chunk must be created using the code in analyze_scallop_grid2.R first.
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+train_years <- 1985:2014
+test_years <- 2004:2014
+
+# read and format in climate data
+clim_avg <- read.csv("processed-data/climate_formatted.csv") %>%
+    group_by(grid, year) %>%
+    summarise(across(where(is.numeric), mean),
+              .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid,1,5)),
+         grid_lon = as.numeric(substr(grid,6,11)))
+
+# covariate data from Morely
+clim_other <- readRDS("data_noaa/trawl/hauls.rds") %>%
+  filter(region %in% c("NEFSC_NEUS")) %>%
+  mutate(grid_lat = case_when(lat-trunc(lat)<0.5 ~ trunc(lat)+0.25,
+                              lat-trunc(lat)>=0.5 ~ 
+                                trunc(lat)+0.75),
+         grid_lon = case_when(abs(lon-trunc(lon))<0.5 ~ 
+                                trunc(lon)-0.25,
+                              abs(lon-trunc(lon))>=0.5 ~ 
+                                trunc(lon)-0.75),
+         grid = paste0(grid_lat,grid_lon)) %>%
+    filter(grid %in% unique(clim_avg$grid),
+         year %in% unique(clim_avg$year),
+         month > 7) %>%
+    group_by(grid, year) %>%
+    summarise(across(where(is.numeric), mean, na.rm = T),
+              .groups = "drop") %>%
+  select(-latgrid, -longrid, -yearsurv, -lat, -lon, month) %>%
+  arrange(grid, year)
+
+# prep dat dens data, excluding smaller scallops (< 80 mm)
+# note: "dat" here must be created in analyze_scallop_grid2.R first
+dat_dens80_occ <- dat %>% 
+  filter(is.na(length) | length >= 8) %>%
+  group_by(haulid, grid, patch, year) %>% 
+  summarise(dens = sum(number_at_length, na.rm = F),
+            .groups = "drop") %>%
+  arrange(patch, grid, year, haulid) %>%
+  group_by(grid, patch, year) %>%
+  summarise(pres = sum(dens>0, na.rm = T),
+            n = sum(haulid!="temp", na.rm = T),
+            .groups = "drop") %>%
+  mutate(pres = as.numeric(ifelse(n==0, NA, pres))) %>%
+  left_join(clim_avg, by = c("grid", "year")) %>%
+  left_join(clim_other, by = c("grid", "year", 
+                               "grid_lat", "grid_lon")) %>%
+  filter(year != 1979)
+
+dat_train_dens80_occ <- dat_dens80_occ %>% 
+  filter(year %in% train_years) 
+
+dat_test_dens80_occ <- dat_dens80_occ %>% 
+  filter(year %in% test_years) 
+
+ymat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = pres) %>%
+  select(-grid) %>%
+  as.matrix()
+
+nmat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = n) %>%
+  select(-grid) %>%
+  as.matrix()
+
+meansbt_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+meansbt_mat_test <- dat_test_dens80_occ %>%
+  select(grid, year, mean_temp) %>%
+  # need to do this because we want all years (even with no hauls)
+  # for prediction
+  right_join(expand.grid(grid = unique(dat_test_dens80_occ$grid),
+                         year = test_years)) %>%
+  left_join(clim_avg, by = c("grid", "year")) %>%
+  select(grid, year, mean_temp = mean_temp.y) %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+maxsbt_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = max_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+o2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = O2) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+depth_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = depth) %>%
+  select(-grid) %>%
+  as.matrix()
+```
+# plot scallop occ vs. mean SBT and O2
+```{r}
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  ggplot(aes(x = mean_temp, y = pres/n,
+             color = depth)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "% of tows")
+# ggsave("figures/niche/occ_v_meanSBT_depth.png",
+       # height = 6, width = 6, dpi = 400)
+
+dat_train_dens80_occ %>% 
+  filter(n>=2) %>% 
+  ggplot(aes(x = mean_temp, y = pres/n,
+             color = O2)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "% of tows")
+# ggsave("figures/niche/occ_v_meanSBT_O2.png",
+#        height = 6, width = 6, dpi = 400)
+
+meanplot <- dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  mutate(pct = pres/n) %>%
+  group_by(grid) %>%
+  summarize(
+    mean_temp = mean(mean_temp),
+    O2 = mean(O2),
+    depth = mean(depth),
+    pct = mean(pct),
+    pres = sum(pres),
+    n = sum(n),
+            .groups = "drop") 
+
+meanplot %>%
+  ggplot(aes(x = mean_temp, y = depth,
+             color = O2)) + 
+  geom_point(size = 5) +
+  geom_point(data = filter(meanplot, pct>0.25),
+             aes(x = mean_temp, y = depth),
+             color = "black", fill = "red", size = 2, shape = 21) +
+  scale_color_viridis_c(option = "inferno")
+
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  ggplot(aes(x = mean_temp, y = O2,
+             color = pres/n)) + 
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno")
+
+```
+# Define the model (Gaussian effect of climatic variable)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_null.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])
+      lgam[i, t-1] <- lgamInt[t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+  # Colonization - Extinction for test period
+  for(i in 1:nSites){
+  for(t in 1:10){ # years
+  gamma_proj[i, t] <-
+    ilogit(lgam[i, t])
+  phi_proj[i, t] <-
+    ilogit(lphi[i,t])
+  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
+  }
+  }
+  
+}
+")
+```
+# Define the model (Gaussian effect of climatic variable)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_gaus.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  Topt2 ~ dnorm(8,16)
+  width2 ~ dnorm(5,10)
+  Topt3 ~ dnorm(8,16)
+  width3 ~ dnorm(5,10)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+  # Colonization - Extinction for test period
+  for(i in 1:nSites){
+  for(t in 1:10){ # years
+  gamma_proj[i, t] <-
+    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
+  phi_proj[i, t] <-
+    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
+  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
+  }
+  }
+  
+}
+")
+```
+# Define the model (Gaussian effect of SBT + monotonic effect of O2)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_gaus_O2.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2[i,t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2[i,t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  Topt2 ~ dnorm(8,16)
+  width2 ~ dnorm(5,10)
+  Topt3 ~ dnorm(8,16)
+  width3 ~ dnorm(5,10)
+  betapsiO2 ~ dnorm(0,5)
+  betaphiO2 ~ dnorm(0,5)
+  betagamO2 ~ dnorm(0,5)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+  # Colonization - Extinction for test period
+  for(i in 1:nSites){
+  for(t in 1:10){ # years
+  gamma_proj[i, t] <-
+    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
+  phi_proj[i, t] <-
+    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
+  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
+  }
+  }
+  
+}
+")
+```
+# Bundle data for JAGS - Gaussian mean SBT model
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(o2_mat)
+
+jdata_meansbt <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar = meansbt_mat, z = z, O2 = o2_matS,
+    climvar_proj = meansbt_mat_test)
+str(jdata_meansbt)
+
+wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
+            "colminusext_proj", "betapsiO2", "betaphiO2", "betagamO2")
+
+# 10 mins
+( out_meansbt_null <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
+                      "scripts/scal_dyn_occ_null.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(out_meansbt_null, "output/out_half_null.rds")
+
+# 10 mins
+( out_meansbt_gaus <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
+                      "scripts/scal_dyn_occ_gaus.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(out_meansbt_gaus, "output/out_half_meansbt_gaus.rds")
+
+# 10 mins
+( out_meansbt_O2 <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
+                      "scripts/scal_dyn_occ_gaus_O2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(out_meansbt_O2, "output/out_half_meansbt_gaus_O2.rds")
+```
+# plot effects - Gaussian mean SBT model
+```{r}
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
+# out_meansbt_gaus <- readRDS("output/out_meansbt_gaus_O2.rds")
+
+plot(out_meansbt_gaus$mean$N, type = "l")
+
+range(meansbt_mat)  #  3.983414 18.407284
+cx <- seq(4, 18.4, length=101)
+
+params <- out_meansbt_gaus$mean
+
+lpsix <- with(params, qlogis(psiInt))
+psix <- plogis(lpsix)*(exp(-0.5*((cx-params$Topt1)/params$width1)^2))
+plot(cx, psix, type='l', lwd=2,
+    xlab="Mean SBT", ylab="Initial occupancy, psi")
+
+lphix <- matrix(NA, 101, 37)
+for(i in 1:37) {
+  lphix[,i] <- with(params, qlogis(phiInt[i]))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+matplot(cx, phix, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Persistence, phi")
+}
+
+lgamx <- matrix(NA, 101, 37)
+for(i in 1:37){
+  lgamx[,i] <- with(params, qlogis(gamInt[i]))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+matplot(cx, gamx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation, gamma")
+}
+
+ldiffx <- matrix(NA, 101, 37)
+for(i in 1:37){
+    lgamx[,i] <- with(params, qlogis(gamInt[i]))
+    lphix[,i] <- with(params, qlogis(phiInt[i]))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+extx <- 1-phix
+diffx <- gamx - extx
+matplot(cx, diffx, type='l', lty=1, lwd=2,
+    xlab="Mean SBT", ylab="Colonisation - Extinction")
+abline(h = 0, lty = 2)
+}
+```
+# Mapping mean Colonization - Extinction (test period)
+```{r}
+out <- readRDS("output/out_meansbt_gaus4.rds")
+
+colext_mat <- apply(out$sims.list$colminusext_proj, c(2,3), median)
+colext_mean <- apply(colext_mat, 1, mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1) %>%
+  mutate(grid = unique(dat_train_dens80_occ$grid)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext_mean)
+
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = colext),
+            # alpha = 1,
+            data = colext_mean,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  labs(x = "", y = "", fill = "Mean predicted\ncolonization - extinction rate\n(2005-2014)",
+       title = "Dynamic occupancy model\n(based on mean SBT)") + 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12))
+
+ggsave("figures/dynocc/projected_colext.png", 
+       height = 6, width = 6, dpi = 400)
+```
+
+
+# Map col-ext for training set for model with and without O2
+```{r}
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
+out_meansbt_gausO2 <- readRDS("output/out_meansbt_gaus_O2.rds")
+params_gaus <- out_meansbt_gaus$mean
+params_gausO2 <- out_meansbt_gausO2$mean
+
+colext_gaus <- params_gaus$gamma-(1-params_gaus$phi) %>%
+  apply(.,1,mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1)
+```
+
+# Mapping change in psi over time
+```{r}
+# http://www.seec.uct.ac.za/dynamic-occupancy-models
+# We estimated occupancy in the first year, \(\Psi_1\). But what about occupancy probabilities in subsequent years? They are derived parameters, calculated as \(\Psi_t = \Psi_{t-1} \times (1-\epsilon_{t-1}) + (1-\Psi_{t-1}) \times \gamma_{t-1}\).
+
+psix <- params$psiInt*(exp(-0.5*((meansbt_mat[,1]-params$Topt1)/params$width1)^2))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+```

@@ -37,8 +37,8 @@ clim_avg <- clim # rename so clim can be used again if 1x1 grid spacing is used
 #############
 train_years <- 1980:2004 # set training year range
 test_years <- 2005:2014 # set testing year range
-season <- "fall" # "spring", "fall", or "both
-grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
+season <- "both" # "spring", "fall", or "both
+grid_1x1 <- 0 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
 max_NA_dens <- 4 # set max number of NA dens values for each cell
 max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
