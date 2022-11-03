@@ -58,7 +58,7 @@ custom_grid_vector = c("35.5-74.5", "36.5-74.5", "36.5-75.5", "37.5-74.5",
 
 manual_selectivity = 1
 do_dirichlet = 1
-eval_l_comps = 1 # evaluate length composition data? 0=no, 1=yes
+eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 0 # 
 T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
