@@ -37,11 +37,11 @@ clim_avg <- clim # rename so clim can be used again if 1x1 grid spacing is used
 #############
 train_years <- 1980:2004 # set training year range
 test_years <- 2005:2014 # set testing year range
-season <- "both" # "spring", "fall", or "both
-grid_1x1 <- 0 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
+season <- "fall" # "spring", "fall", or "both
+grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
 max_NA_dens <- 4 # set max number of NA dens values for each cell
 max_NA_sbt <- 4 # set max number of NA sbt values for each cell
-lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
+lagged_sbt <- 1 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
 use_custom_grid = 0
@@ -60,7 +60,7 @@ manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 1 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 0 # 
-T_dep_recruitment = 0 #
+T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
@@ -518,7 +518,22 @@ for(p in 1:np){
   }
 }
 
-sbt_proj[is.na(sbt_proj)] <- 999999
+# or lagged sbt (1 yr)
+if(lagged_sbt == 1){
+  sbt_proj <- array(NA, dim=c(np,ny_proj))
+  for(p in 1:np){
+    print(p)
+    for(y in 1:ny_proj){
+      tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+      if(nrow(tmp6) != 0){
+        sbt_proj[p,y] <- tmp6$lclimvar
+      }
+    }
+}
+} # close if lagged_sbt = 1
+
+sbt_proj[is.na(sbt_proj)] <- mean(sbt_proj, na.rm = T) # temporary; no density data for these obs
+                                                      # fix if mapping projected dens is desired
 
 f <- array(NA, dim=c(n_ages,ny))
 for(a in min_age:max_age){
@@ -583,7 +598,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221031a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221103a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221006a.rds"))
 
 warmups <- 1000
@@ -654,7 +669,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221031a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221103a.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221024a.rds"))
 
 # assess how many divergent transitions in each chain
