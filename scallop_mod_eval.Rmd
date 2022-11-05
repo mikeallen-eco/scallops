@@ -17,6 +17,8 @@ library(sf)
 
 # load posteriors for mean SBTemp vs. recruitment
 rmean <- readRDS("results/stan_model_posts_run20221012a.rds")
+# rmean_len <- readRDS("results/stan_model_posts_run20221031a.rds")
+rmeanL1 <- readRDS("results/stan_model_posts_run20221103a.rds")
 mmean <- readRDS("results/stan_model_posts_run20221018a.rds") 
 rmax <- readRDS("results/stan_model_posts_run20221019a.rds")
 mmax <- readRDS("results/stan_model_posts_run20221019b.rds") 
@@ -68,7 +70,6 @@ obspred_rmean %>%
   # filter(obs80 > 0) %>%
   filter(is.na(obs80)==F) %>%
   ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
-  # ggplot(aes(x = obs_lambda, y = est_lambda,
              color = year)) +
   geom_point(size = 4,
              alpha = .4) +
