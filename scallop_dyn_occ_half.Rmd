@@ -12,7 +12,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 
-train_years <- 1985:2014
+train_years <- 1983:2014
 test_years <- 2004:2014
 
 # read and format in climate data
@@ -59,13 +59,34 @@ dat_dens80_occ <- dat %>%
   left_join(clim_avg, by = c("grid", "year")) %>%
   left_join(clim_other, by = c("grid", "year", 
                                "grid_lat", "grid_lon")) %>%
-  filter(year != 1979)
+  filter(year != 1979) %>%
+  group_by(grid) %>%
+  mutate(mean_depth = mean(depth, na.rm = T)) %>%
+  arrange(grid, year) %>%
+  mutate(min_tempL1 = lag(min_temp),
+         max_tempL1 = lag(max_temp),
+         mean_tempL1 = lag(mean_temp),
+         min_tempL2 = lag(min_temp,2),
+         max_tempL2 = lag(max_temp,2),
+         mean_tempL2 = lag(mean_temp,2),
+         min_tempL3 = lag(min_temp,3),
+         max_tempL3 = lag(max_temp,3),
+         mean_tempL3 = lag(mean_temp,3),
+         O2L1 = lag(O2),
+         O2L2 = lag(O2,2),
+         O2L3 = lag(O2,3)) %>%
+  select(grid, year, pres, n, grid_lon, grid_lat, 
+         min_temp, min_tempL1, min_tempL2, min_tempL3,
+         mean_temp, mean_tempL1, mean_tempL2, mean_tempL3,
+         max_temp, max_tempL1, max_tempL2, max_tempL3,
+         O2, O2L1, O2L2, O2L3, mean_depth) %>%
+  ungroup()
 
 dat_train_dens80_occ <- dat_dens80_occ %>% 
   filter(year %in% train_years) 
 
-dat_test_dens80_occ <- dat_dens80_occ %>% 
-  filter(year %in% test_years) 
+# dat_test_dens80_occ <- dat_dens80_occ %>% 
+#   filter(year %in% test_years) 
 
 ymat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
@@ -88,19 +109,19 @@ meansbt_mat <- dat_train_dens80_occ %>%
   select(-grid) %>%
   as.matrix() 
 
-meansbt_mat_test <- dat_test_dens80_occ %>%
-  select(grid, year, mean_temp) %>%
-  # need to do this because we want all years (even with no hauls)
-  # for prediction
-  right_join(expand.grid(grid = unique(dat_test_dens80_occ$grid),
-                         year = test_years)) %>%
-  left_join(clim_avg, by = c("grid", "year")) %>%
-  select(grid, year, mean_temp = mean_temp.y) %>%
-  pivot_wider(id_cols = grid,
-              names_from = year,
-              values_from = mean_temp) %>%
-  select(-grid) %>%
-  as.matrix() 
+# meansbt_mat_test <- dat_test_dens80_occ %>%
+#   select(grid, year, mean_temp) %>%
+#   # need to do this because we want all years (even with no hauls)
+#   # for prediction
+#   right_join(expand.grid(grid = unique(dat_test_dens80_occ$grid),
+#                          year = test_years)) %>%
+#   left_join(clim_avg, by = c("grid", "year")) %>%
+#   select(grid, year, mean_temp = mean_temp.y) %>%
+#   pivot_wider(id_cols = grid,
+#               names_from = year,
+#               values_from = mean_temp) %>%
+#   select(-grid) %>%
+#   as.matrix() 
 
 maxsbt_mat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
@@ -109,17 +130,87 @@ maxsbt_mat <- dat_train_dens80_occ %>%
   select(-grid) %>%
   as.matrix() 
 
-o2_mat <- dat_train_dens80_occ %>%
+maxsbtL1_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = max_tempL1) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+maxsbtL2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = max_tempL2) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+maxsbtL3_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = max_tempL3) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+minsbt_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = min_temp) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+minsbtL1_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = min_tempL1) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+minsbtL2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = min_tempL2) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+minsbtL3_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = min_tempL3) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+O2_mat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
               names_from = year,
               values_from = O2) %>%
   select(-grid) %>%
   as.matrix() 
 
+O2L1_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = O2L1) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+O2L2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = O2L2) %>%
+  select(-grid) %>%
+  as.matrix() 
+
+O2L3_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = O2L3) %>%
+  select(-grid) %>%
+  as.matrix() 
+
 depth_mat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
               names_from = year,
-              values_from = depth) %>%
+              values_from = mean_depth) %>%
   select(-grid) %>%
   as.matrix()
 ```
@@ -128,7 +219,7 @@ depth_mat <- dat_train_dens80_occ %>%
 dat_train_dens80_occ %>% 
   filter(n>=5) %>% 
   ggplot(aes(x = mean_temp, y = pres/n,
-             color = depth)) + 
+             color = mean_depth)) + 
   geom_point(size = 3, alpha = .7) +
   scale_color_viridis_c(option = "inferno") +
   labs(y = "% of tows")
@@ -136,7 +227,7 @@ dat_train_dens80_occ %>%
        # height = 6, width = 6, dpi = 400)
 
 dat_train_dens80_occ %>% 
-  filter(n>=2) %>% 
+  filter(n>=3) %>% 
   ggplot(aes(x = mean_temp, y = pres/n,
              color = O2)) + 
   geom_point(size = 3, alpha = .7) +
@@ -152,39 +243,113 @@ meanplot <- dat_train_dens80_occ %>%
   summarize(
     mean_temp = mean(mean_temp),
     O2 = mean(O2),
-    depth = mean(depth),
+    depth = mean(mean_depth),
     pct = mean(pct),
     pres = sum(pres),
     n = sum(n),
             .groups = "drop") 
 
 meanplot %>%
-  ggplot(aes(x = mean_temp, y = depth,
+  ggplot(aes(y = mean_temp, x = depth,
              color = O2)) + 
   geom_point(size = 5) +
-  geom_point(data = filter(meanplot, pct>0.25),
-             aes(x = mean_temp, y = depth),
+  geom_point(data = filter(meanplot, pct>0.35),
+             aes(y = mean_temp, x = depth),
+             color = "black", fill = "red", size = 2, shape = 21) +
+  scale_color_viridis_c(option = "inferno")
+
+meanplot %>%
+  ggplot(aes(y = O2, x = depth,
+             color = mean_temp)) + 
+  geom_point(size = 5) +
+  geom_point(data = filter(meanplot, pct>0.5),
+             aes(y = O2, x = depth),
              color = "black", fill = "red", size = 2, shape = 21) +
   scale_color_viridis_c(option = "inferno")
 
 dat_train_dens80_occ %>% 
   filter(n>=5) %>% 
-  ggplot(aes(x = mean_temp, y = O2,
-             color = pres/n)) + 
+  ggplot(aes(x = mean_depth, y = O2,
+             color = mean_temp)) + 
   geom_point(size = 3, alpha = .7) +
-  scale_color_viridis_c(option = "inferno")
+  geom_point(data = filter(dat_train_dens80_occ, (pres/n)>0.5),
+             aes(y = O2, x = mean_depth),
+             color = "black", fill = "red", size = 2, shape = 21) +
+  scale_color_viridis_c(option = "inferno") +
+  theme_bw()
+
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  ggplot(aes(x = mean_depth, y = mean_temp,
+             color = O2)) + 
+  geom_point(size = 4, alpha = .5) +
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(pres/n)>=0.8),
+             aes(y = mean_temp, x = mean_depth),
+             color = "black", fill = "red", size = 2, shape = 21) +
+  scale_color_viridis_c(option = "inferno") +
+  theme_bw()
 
 ```
-# Define the model (Gaussian effect of climatic variable)
+# Define the model (psi., phi., gam.)
 ```{r}
 
-cat(file = "scripts/scal_dyn_occ_null.txt", 
+cat(file = "scripts/scal_dyn_occ_psi.phi.gam..txt", 
     "
 model{
   for(i in 1:nSites) {
     # biological process
     lpsi1[i] <- lpsiInt
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    psi1[i] <- ilogit(lpsi1[i])
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])
+      lgam[i, t-1] <- lgamInt[t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+
+}
+")
+```
+# Define the model (psi.meanSBT, phi., gam.)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_psi.sbt.phi.gam..txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
     z[i, 1] ~ dbern(psi1[i])
     for(t in 2:nYears) {
       lphi[i, t-1] <- lphiInt[t-1]
@@ -225,38 +390,83 @@ model{
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
   
-  # Colonization - Extinction for test period
-  for(i in 1:nSites){
-  for(t in 1:10){ # years
-  gamma_proj[i, t] <-
-    ilogit(lgam[i, t])
-  phi_proj[i, t] <-
-    ilogit(lphi[i,t])
-  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
-  }
-  }
-  
+
 }
 ")
 ```
-# Define the model (Gaussian effect of climatic variable)
+# Define the model (psi.meanSBT.o2, phi., gam.)
 ```{r}
 
-cat(file = "scripts/scal_dyn_occ_gaus.txt", 
+cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])
+      lgam[i, t-1] <- lgamInt[t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    }
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  betapsiO2 ~ dnorm(0,5)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+
+}
+")
+```
+# Define the model (psi.sbt, phi.sbt, gam.sbt)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt", 
     "
 model{
   for(i in 1:nSites) {
     # biological process
     lpsi1[i] <- lpsiInt
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
     z[i, 1] ~ dbern(psi1[i])
     for(t in 2:nYears) {
       lphi[i, t-1] <- lphiInt[t-1]
       phi[i, t-1] <-
-        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
       lgam[i, t-1] <- lgamInt[t-1]
       gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
       z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
           (1 - z[i, t-1])*gamma[i, t-1])
    }
@@ -293,38 +503,27 @@ model{
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
   
-  # Colonization - Extinction for test period
-  for(i in 1:nSites){
-  for(t in 1:10){ # years
-  gamma_proj[i, t] <-
-    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
-  phi_proj[i, t] <-
-    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
-  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
-  }
-  }
-  
 }
 ")
 ```
-# Define the model (Gaussian effect of SBT + monotonic effect of O2)
+# Define the model (psi.sbt.o2, phi.sbt.o2, gam.sbt.o2)
 ```{r}
 
-cat(file = "scripts/scal_dyn_occ_gaus_O2.txt", 
+cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt", 
     "
 model{
   for(i in 1:nSites) {
     # biological process
-    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar[i,1]-Topt1)/width1)^2)
+    lpsi1[i] <- lpsiInt + betapsiO2*O2a[i,1]
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
     z[i, 1] ~ dbern(psi1[i])
     for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2[i,t-1]
+      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2b[i,t-1]
       phi[i, t-1] <-
-        ilogit(lphi[i,t-1])*exp(-0.5*((climvar[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2[i,t-1]
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2c[i,t-1]
       gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])*exp(-0.5*((climvar[i,t-1]-Topt3)/width3)^2)
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
       z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
           (1 - z[i, t-1])*gamma[i, t-1])
    }
@@ -364,21 +563,10 @@ model{
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
   
-  # Colonization - Extinction for test period
-  for(i in 1:nSites){
-  for(t in 1:10){ # years
-  gamma_proj[i, t] <-
-    ilogit(lgam[i, t])*exp(-0.5*((climvar_proj[i,t]-Topt3)/width3)^2)
-  phi_proj[i, t] <-
-    ilogit(lphi[i,t])*exp(-0.5*((climvar_proj[i,t]-Topt2)/width2)^2)
-  colminusext_proj[i, t] <- gamma_proj[i, t] - (1 - phi_proj[i, t])
-  }
-  }
-  
 }
 ")
 ```
-# Bundle data for JAGS - Gaussian mean SBT model
+# Bundle data for JAGS & run models
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -386,40 +574,144 @@ z[z == 0] <- NA
 
 # Standardize covariates
 o2_matS <- wiqid::standardize(o2_mat)
+depth_matS <- wiqid::standardize(depth_mat)
 
-jdata_meansbt <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar = meansbt_mat, z = z, O2 = o2_matS,
-    climvar_proj = meansbt_mat_test)
-str(jdata_meansbt)
+jdata <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbt_mat, z = z, depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
+str(jdata)
 
 wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
-            "colminusext_proj", "betapsiO2", "betaphiO2", "betagamO2")
+            "betapsiO2", "betaphiO2", "betagamO2")
 
-# 10 mins
-( out_meansbt_null <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
-                      "scripts/scal_dyn_occ_null.txt",
+# psi.phi.gam.
+( psi.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
+                      "scripts/scal_dyn_occ_psi.phi.gam..txt",
                       n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(out_meansbt_null, "output/out_half_null.rds")
+saveRDS(psi.phi.gam., "output/psi.phi.gam.rds")
 
-# 10 mins
-( out_meansbt_gaus <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
-                      "scripts/scal_dyn_occ_gaus.txt",
+# psi.meansbt.phi.gam.
+( psi.meansbt.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
+                      "scripts/scal_dyn_occ_psi.sbt.phi.gam..txt",
                       n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(out_meansbt_gaus, "output/out_half_meansbt_gaus.rds")
+saveRDS(psi.meansbt.phi.gam., "output/psi.meansbt.phi.gam.rds")
 
-# 10 mins
-( out_meansbt_O2 <- jagsUI::jags(jdata_meansbt, NULL, wanted, 
-                      "scripts/scal_dyn_occ_gaus_O2.txt",
+# psi.meansbt.o2.phi.gam.
+( psi.meansbt.o2.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
+                      "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt",
                       n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(out_meansbt_O2, "output/out_half_meansbt_gaus_O2.rds")
+saveRDS(psi.meansbt.o2.phi.gam., "output/psi.meansbt.o2.phi.gam.rds")
+
+# psi.meansbt.depth.phi.gam.
+jdata_depth <- jdata
+jdata_depth$O2 <- jdata$depth
+( psi.meansbt.depth.phi.gam. <- jagsUI::jags(jdata_depth, NULL, wanted, 
+                      "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.depth.phi.gam.,
+        "output/psi.meansbt.depth.phi.gam.rds")
+
+# psi.meansbt.phi.maxsbt.gam.minsbt
+( psi.meansbt.phi.maxsbt.gam.minsbt <- 
+    jagsUI::jags(jdata, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.phi.maxsbt.gam.minsbt,
+        "output/psi.meansbt.phi.maxsbt.gam.minsbt.rds")
+
+# psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2
+( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
+    jagsUI::jags(jdata, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
+        "output/psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2.rds")
+
+# psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth
+( psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth <- 
+    jagsUI::jags(jdata_depth, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth,
+        "output/psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth.rds")
 ```
+# Bundle data for JAGS & run models
+# LAG 1 for Persistence; LAG 2 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(o2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+
+jdataL1L2 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbtL1_mat, 
+    climvar3 = minsbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2L1_matS, O2c = o2L2_matS)
+str(jdataL1L2)
+
+wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
+            "betapsiO2", "betaphiO2", "betagamO2")
+
+# psi.meansbt.phi.maxsbtL1.gam.minsbtL2
+( psi.meansbt.phi.maxsbtL1.gam.minsbtL2 <- 
+    jagsUI::jags(jdataL1L2, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL2,
+        "output/psi.meansbt.phi.maxsbtL1.gam.minsbtL2.rds")
+
+# psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2
+( psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2 <- 
+    jagsUI::jags(jdataL1L2, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2,
+        "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2.rds")
+
+# psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth
+jdataL1L2_depth <- jdataL1L2
+jdataL1L2_depth$O2 <- jdataL1L2$depth
+( psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth <- 
+    jagsUI::jags(jdataL1L2_depth, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth,
+  "output/psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth.rds")
+```
+# Map mean colonization - extinction by patch
+```{r}
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$gamma - (1-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$phi)
+```
+
+
 # plot effects - Gaussian mean SBT model
 ```{r}
 out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
