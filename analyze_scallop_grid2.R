@@ -64,7 +64,7 @@ T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
-btemp_meas <- "min" # "min", "mean", "max", or "O2"
+btemp_meas <- "mean" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -598,7 +598,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221103b.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221110a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221019c.rds"))
 
 warmups <- 1000
@@ -624,7 +624,7 @@ raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825,
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)#[2:25]
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_linear.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -669,7 +669,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_li
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221104a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221110a.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221103a.rds"))
 
 # assess how many divergent transitions in each chain
@@ -710,16 +710,16 @@ summary(stan_model_fit)$summary$Rhat
 post <- list(
 T_adjust = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
 T_adjust_proj = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
-Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
-Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
-# Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
-# width = rstan::extract(stan_model_fit, "width")$width,
+# Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
+# Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
+Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
+width = rstan::extract(stan_model_fit, "width")$width,
 dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
 proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221104a.rds")
+saveRDS(post, "results/stan_model_posts_run20221110a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
