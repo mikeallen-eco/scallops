@@ -111,6 +111,30 @@ meansbt_mat <- dat_train_dens80_occ %>%
 # fill in NA with mean (doesn't matter as all correspond with NA ymat)
 meansbt_mat[is.na(meansbt_mat)] <- mean(meansbt_mat, na.rm = T)
 
+meansbtL1_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_tempL1) %>%
+  select(-grid) %>%
+  as.matrix() 
+meansbtL1_mat[is.na(meansbtL1_mat)] <- mean(meansbtL1_mat, na.rm = T)
+
+meansbtL2_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_tempL2) %>%
+  select(-grid) %>%
+  as.matrix() 
+meansbtL2_mat[is.na(meansbtL2_mat)] <- mean(meansbtL2_mat, na.rm = T)
+
+meansbtL3_mat <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = mean_tempL3) %>%
+  select(-grid) %>%
+  as.matrix() 
+meansbtL3_mat[is.na(meansbtL3_mat)] <- mean(meansbtL3_mat, na.rm = T)
+
 # meansbt_mat_test <- dat_test_dens80_occ %>%
 #   select(grid, year, mean_temp) %>%
 #   # need to do this because we want all years (even with no hauls)
@@ -582,7 +606,7 @@ model{
 }
 ")
 ```
-# Bundle data for JAGS & run models
+# Bundle data for JAGS & run models (no lags)
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -668,7 +692,7 @@ saveRDS(psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth,
         "output/psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth.rds")
 ```
 # Bundle data for JAGS & run models
-# LAG 0 for Persistence; LAG 1 for Colonization
+# LAG 0 for Persistence; LAGS 1-3 for Colonization
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -733,6 +757,91 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
 saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
         "output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2.rds")
 ```
+# Bundle data for JAGS & run models (mean SBT only)
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+
+jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
+str(jdata_L0mean)
+
+jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS)
+str(jdataL0L1a)
+
+jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS)
+str(jdataL0L2)
+
+jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS)
+str(jdataL0L3a)
+
+wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
+            "betapsiO2", "betaphiO2", "betagamO2")
+
+# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
+( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
+    jagsUI::jags(jdata_L0mean, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
+    jagsUI::jags(jdataL0L1a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
+    jagsUI::jags(jdataL0L2a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
+    jagsUI::jags(jdataL0L3a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
+```
+
+
+
 # Bundle data for JAGS & run models
 # LAG 1 for Persistence; LAG 1 for Colonization
 ```{r}
@@ -775,18 +884,6 @@ saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL1,
 
 saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2,
         "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2.rds")
-
-# psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL1.depth
-jdataL1L1_depth <- jdataL1L1
-jdataL1L1_depth$O2 <- jdataL1L1$depth
-( psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth <- 
-    jagsUI::jags(jdataL1L1_depth, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL1.depth,
-  "output/psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL1.depth.rds")
 ```
 # Bundle data for JAGS & run models
 # LAG 1 for Persistence; LAG 2 for Colonization
@@ -901,61 +998,152 @@ saveRDS(psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL3.depth,
 ```
 # check model output
 ```{r}
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2.rds")
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2$q97.5$betagamO2
 
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2.rds")
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2$q97.5$betagamO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2.rds")
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt1
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width1
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt3
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width3
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betapsiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betaphiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betagamO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betagamO2
 
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2.rds")
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2$q97.5$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2.rds")
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betagamO2
 
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2.rds")
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betagamO2
 
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2.rds")
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width1
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width3
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betagamO2
+
+# model runs with only mean SBT
+
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.rds")
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt1
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width1
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt3
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width3
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betapsiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betaphiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betagamO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betagamO2
+
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betagamO2
+
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.rds")
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betagamO2
+
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
+  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width1
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width3
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betapsiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betaphiO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betagamO2
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betagamO2
 
 
 
