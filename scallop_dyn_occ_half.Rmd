@@ -11,6 +11,7 @@ Note: the "dat" object in this chunk must be created using the code in analyze_s
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(sf)
 
 train_years <- 1983:2014
 test_years <- 2004:2014
@@ -52,9 +53,11 @@ dat_dens80_occ <- dat %>%
   arrange(patch, grid, year, haulid) %>%
   group_by(grid, patch, year) %>%
   summarise(pres = sum(dens>0, na.rm = T),
+            presb = sum(dens>27, na.rm = T), # 28 is top 5% of hauls
             n = sum(haulid!="temp", na.rm = T),
             .groups = "drop") %>%
-  mutate(pres = as.numeric(ifelse(n==0, NA, pres))) %>%
+  mutate(pres = as.numeric(ifelse(n==0, NA, pres)),
+         presb = as.numeric(ifelse(n==0, NA, presb))) %>%
   left_join(clim_avg, by = c("grid", "year")) %>%
   left_join(clim_other, by = c("grid", "year", 
                                "grid_lat", "grid_lon")) %>%
@@ -74,7 +77,7 @@ dat_dens80_occ <- dat %>%
          O2L1 = lag(O2),
          O2L2 = lag(O2,2),
          O2L3 = lag(O2,3)) %>%
-  select(grid, year, pres, n, grid_lon, grid_lat, 
+  select(grid, year, pres, presb, n, grid_lon, grid_lat, 
          min_temp, min_tempL1, min_tempL2, min_tempL3,
          mean_temp, mean_tempL1, mean_tempL2, mean_tempL3,
          max_temp, max_tempL1, max_tempL2, max_tempL3,
@@ -87,12 +90,28 @@ dat_train_dens80_occ <- dat_dens80_occ %>%
 # dat_test_dens80_occ <- dat_dens80_occ %>% 
 #   filter(year %in% test_years) 
 
+# matrix of number of "detected" samples per cell and year
 ymat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
               names_from = year,
               values_from = pres) %>%
   select(-grid) %>%
   as.matrix()
+
+# matrix of number of "detected" samples per cell and year 
+    # including only those that were "bonanzas" (top 5% of hauls)
+ymatb <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = presb) %>%
+  select(-grid) %>%
+  as.matrix()
+
+ymat_gridnames <- dat_train_dens80_occ %>%
+  pivot_wider(id_cols = grid,
+              names_from = year,
+              values_from = pres) %>%
+  select(grid)
 
 nmat <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
@@ -254,8 +273,16 @@ depth_mat <- dat_train_dens80_occ %>%
 depth_mat[is.na(depth_mat)] <- mean(depth_mat, na.rm = T)
 
 ```
-# plot scallop occ vs. mean SBT and O2
+# data exploration
 ```{r}
+# correlation among mean SBT, O2, and depth
+cor(cbind(dat_dens80_occ$mean_temp, dat_dens80_occ$O2, dat_dens80_occ$mean_depth))
+#            [,1]       [,2]       [,3]
+# [1,]  1.0000000  0.1675016 -0.5597515
+# [2,]  0.1675016  1.0000000 -0.7768805
+# [3,] -0.5597515 -0.7768805  1.0000000
+
+# plot scallop occ vs. mean SBT and O2
 dat_train_dens80_occ %>% 
   filter(n>=5) %>% 
   ggplot(aes(x = mean_temp, y = pres/n,
@@ -312,7 +339,7 @@ dat_train_dens80_occ %>%
   ggplot(aes(x = mean_depth, y = O2,
              color = mean_temp)) + 
   geom_point(size = 3, alpha = .7) +
-  geom_point(data = filter(dat_train_dens80_occ, (pres/n)>0.5),
+  geom_point(data = filter(dat_train_dens80_occ, (pres/n)>0.8),
              aes(y = O2, x = mean_depth),
              color = "black", fill = "red", size = 2, shape = 21) +
   scale_color_viridis_c(option = "inferno") +
@@ -326,225 +353,13 @@ dat_train_dens80_occ %>%
   geom_point(data = filter(dat_train_dens80_occ, n>=5,(pres/n)>=0.8),
              aes(y = mean_temp, x = mean_depth),
              color = "black", fill = "red", size = 2, shape = 21) +
+  labs(x = "Mean depth (m)", y = "Mean bottom temperature (C)") +
   scale_color_viridis_c(option = "inferno") +
   theme_bw()
 
-```
-# Define the model (psi., phi., gam.)
-```{r}
+ggsave("figures/dynocc/scal_pres_v_temp_O2.png", 
+       height = 4, width = 6, dpi = 400)
 
-cat(file = "scripts/scal_dyn_occ_psi.phi.gam..txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt
-    psi1[i] <- ilogit(lpsi1[i])
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])
-      lgam[i, t-1] <- lgamInt[t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    }
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-
-}
-")
-```
-# Define the model (psi.meanSBT, phi., gam.)
-```{r}
-
-cat(file = "scripts/scal_dyn_occ_psi.sbt.phi.gam..txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])
-      lgam[i, t-1] <- lgamInt[t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    }
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  Topt1 ~ dnorm(8,16)
-  width1 ~ dnorm(5,10)
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-  
-
-}
-")
-```
-# Define the model (psi.meanSBT.o2, phi., gam.)
-```{r}
-
-cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt + betapsiO2*O2[i,1]
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])
-      lgam[i, t-1] <- lgamInt[t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    }
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  Topt1 ~ dnorm(8,16)
-  width1 ~ dnorm(5,10)
-  betapsiO2 ~ dnorm(0,5)
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-  
-
-}
-")
-```
-# Define the model (psi.sbt, phi.sbt, gam.sbt)
-```{r}
-
-cat(file = "scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    }
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  Topt1 ~ dnorm(8,16)
-  width1 ~ dnorm(5,10)
-  Topt2 ~ dnorm(8,16)
-  width2 ~ dnorm(5,10)
-  Topt3 ~ dnorm(8,16)
-  width3 ~ dnorm(5,10)
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-  
-}
-")
 ```
 # Define the model (psi.sbt.o2, phi.sbt.o2, gam.sbt.o2)
 ```{r}
@@ -606,93 +421,9 @@ model{
 }
 ")
 ```
-# Bundle data for JAGS & run models (no lags)
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-
-jdata <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = minsbt_mat, z = z, depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
-str(jdata)
-
-wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
-            "betapsiO2", "betaphiO2", "betagamO2")
-
-# psi.phi.gam.
-( psi.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
-                      "scripts/scal_dyn_occ_psi.phi.gam..txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.phi.gam., "output/psi.phi.gam.rds")
-
-# psi.meansbt.phi.gam.
-( psi.meansbt.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
-                      "scripts/scal_dyn_occ_psi.sbt.phi.gam..txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.phi.gam., "output/psi.meansbt.phi.gam.rds")
-
-# psi.meansbt.o2.phi.gam.
-( psi.meansbt.o2.phi.gam. <- jagsUI::jags(jdata, NULL, wanted, 
-                      "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.gam., "output/psi.meansbt.o2.phi.gam.rds")
-
-# psi.meansbt.depth.phi.gam.
-jdata_depth <- jdata
-jdata_depth$O2 <- jdata$depth
-( psi.meansbt.depth.phi.gam. <- jagsUI::jags(jdata_depth, NULL, wanted, 
-                      "scripts/scal_dyn_occ_psi.sbt.o2.phi.gam..txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.depth.phi.gam.,
-        "output/psi.meansbt.depth.phi.gam.rds")
-
-# psi.meansbt.phi.maxsbt.gam.minsbt
-( psi.meansbt.phi.maxsbt.gam.minsbt <- 
-    jagsUI::jags(jdata, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.phi.maxsbt.gam.minsbt,
-        "output/psi.meansbt.phi.maxsbt.gam.minsbt.rds")
-
-# psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2
-( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
-    jagsUI::jags(jdata, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
-        "output/psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2.rds")
-
-# psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth
-( psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth <- 
-    jagsUI::jags(jdata_depth, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth,
-        "output/psi.meansbt.depth.phi.maxsbt.depth.gam.minsbt.depth.rds")
-```
 # Bundle data for JAGS & run models
-# LAG 0 for Persistence; LAGS 1-3 for Colonization
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+# Mean, Max, Min SBT hypothesis
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -704,6 +435,12 @@ o2L1_matS <- wiqid::standardize(O2L1_mat)
 o2L2_matS <- wiqid::standardize(O2L2_mat)
 o2L3_matS <- wiqid::standardize(O2L3_mat)
 depth_matS <- wiqid::standardize(depth_mat)
+
+jdata <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbt_mat, z = z, depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
+str(jdata)
 
 jdataL0L1 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
@@ -726,6 +463,17 @@ str(jdataL0L3)
 wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
             "betapsiO2", "betaphiO2", "betagamO2")
+
+# lag 0 for all variables
+# psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2
+( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
+    jagsUI::jags(jdata, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
+        "output/psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2.rds")
 
 # psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2
 ( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
@@ -759,6 +507,7 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
 ```
 # Bundle data for JAGS & run models (mean SBT only)
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
+# Mean, mean, mean SBT hypothesis
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -984,17 +733,6 @@ saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL3,
 saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2,
         "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2.rds")
 
-# psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL3.depth
-jdataL1L3_depth <- jdataL1L3
-jdataL1L3_depth$O2 <- jdataL1L3$depth
-( psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL3.depth <- 
-    jagsUI::jags(jdataL1L3_depth, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL3.depth,
-  "output/psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL3.depth.rds")
 ```
 # check model output
 ```{r}
@@ -1148,17 +886,157 @@ psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betagamO2
 
 
 ```
-
-
 # Map mean colonization - extinction by patch
 ```{r}
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$gamma - (1-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$phi)
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
+
+# get posteriors for colonization (by cell and year)
+col.p <- 
+  psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$gamma
+
+# get posteriors for extinction (by cell and year)
+ext.p <-
+  1-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$phi
+
+# get posteriors for col - ext (by cell and year)
+colext.p <- col.p - ext.p
+
+# to check that apply worked right
+# colext.m <- psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$gamma - (1-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$phi)
+
+# get mean & q2.5 of posterior for col - ext by cell and year
+colext.mean.by.year = apply(colext.p, c(2,3), mean)
+colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
+colext.q1.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.01))
+colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+colext.q10.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.10))
+
+# put mean col-ext by cell (across years) into a dataframe for mapping
+colext <- ymat_gridnames %>%
+  mutate(colext.mean = colext.mean.all.years,
+         colext.q1 = colext.q1.all.years,
+         colext.q5 = colext.q5.all.years,
+         colext.q10 = colext.q10.all.years,
+         grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext)
+
+# map estimated change in scallop abundance per 1-2
+colext %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = colext.mean),
+              color = "black") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q5>0),
+               shape = "x") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean colonization - extinction\n(1983-2014)") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/dynocc/scallop_dynocc_predicted_colext.png",
+        height = 5, width = 5, dpi = 400)
 ```
+# map scallop abundance (1983-1997) & (1999-2014)
+```{r}
+
+obs80_rmean_train1 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens) %>%
+  filter(year %in% 1983:1998) %>%
+  group_by(grid) %>%
+  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+obs80_rmean_train2 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens) %>%
+  filter(year %in% 1999:2014) %>%
+  group_by(grid) %>%
+  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# map observed density, 1983-1998  
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
+            data = obs80_rmean_train1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
+       title = "Observed density, 1983-1998") + 
+  scale_fill_viridis_c(option = "inferno",
+                       limits = c(0,520)) +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+
+ggsave("figures/dynocc/obsdens80_1983_1998.png", 
+       height = 6, width = 6, dpi = 400)
+
+# map observed density, 1999-2014  
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
+            data = obs80_rmean_train2,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
+       title = "Observed density, 1999-2014") + 
+  scale_fill_viridis_c(option = "inferno",
+                       limits = c(0,520)) +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+
+ggsave("figures/dynocc/obsdens80_1999_2014.png", 
+       height = 6, width = 6, dpi = 400)
 
 
-
-
-
+```
 
 
 
