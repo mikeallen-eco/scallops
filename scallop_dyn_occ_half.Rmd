@@ -347,17 +347,42 @@ dat_train_dens80_occ %>%
 
 dat_train_dens80_occ %>% 
   filter(n>=5) %>% 
-  ggplot(aes(x = mean_depth, y = mean_temp,
-             color = O2)) + 
+  ggplot(aes(x = mean_depth, y = mean_tempL1,
+             color = O2L1)) + 
   geom_point(size = 4, alpha = .5) +
   geom_point(data = filter(dat_train_dens80_occ, n>=5,(pres/n)>=0.8),
              aes(y = mean_temp, x = mean_depth),
              color = "black", fill = "red", size = 2, shape = 21) +
-  labs(x = "Mean depth (m)", y = "Mean bottom temperature (C)") +
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(presb/n)>=0.8),
+             aes(y = mean_temp, x = mean_depth),
+             color = "black", fill = "black", size = 1, shape = 21) +
+  labs(x = "Mean depth (m)", 
+       y = "Mean bottom temperature (C)",
+       color = "O2") +
   scale_color_viridis_c(option = "inferno") +
   theme_bw()
 
-ggsave("figures/dynocc/scal_pres_v_temp_O2.png", 
+ggsave("figures/dynocc/scal_pres_v_temp_O2_L1.png", 
+       height = 4, width = 6, dpi = 400)
+
+dat_train_dens80_occ %>% 
+  filter(n>=5) %>% 
+  ggplot(aes(x = mean_tempL1, y = O2L1,
+             color = mean_depth)) + 
+  geom_point(size = 4, alpha = .5) +
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(pres/n)>=0.8),
+             aes(y = O2, x = mean_temp),
+             color = "black", fill = "red", size = 2, shape = 21) +
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(presb/n)>=0.8),
+             aes(y = O2, x = mean_temp),
+             color = "black", fill = "black", size = 1, shape = 21) +
+  labs(x = "Mean bottom temperature (C)", 
+       y = "Oxygen concentration",
+       color = "Depth (m)") +
+  scale_color_viridis_c(option = "inferno") +
+  theme_bw()
+
+ggsave("figures/dynocc/scal_pres_v_temp_O2b_L1.png", 
        height = 4, width = 6, dpi = 400)
 
 ```
@@ -422,8 +447,8 @@ model{
 ")
 ```
 # Bundle data for JAGS & run models
-# LAG 0 for Persistence; LAGS 0-3 for Colonization
 # Mean, Max, Min SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -460,7 +485,7 @@ jdataL0L3 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS)
 str(jdataL0L3)
 
-wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
+wanted <- c("lgamInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
             "betapsiO2", "betaphiO2", "betagamO2")
 
@@ -506,8 +531,8 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
         "output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2.rds")
 ```
 # Bundle data for JAGS & run models (mean SBT only)
-# LAG 0 for Persistence; LAGS 0-3 for Colonization
 # Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
 ```{r}
 # Get known values of z
 z <- (ymat > 0)*1
@@ -588,112 +613,13 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
 ```
-
-
-
-# Bundle data for JAGS & run models
-# LAG 1 for Persistence; LAG 1 for Colonization
+# Bonanza model (90th percentile hauls): 
+# Bundle data for JAGS & run models (mean SBT only)
+# Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
 ```{r}
 # Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-o2L1_matS <- wiqid::standardize(O2L1_mat)
-o2L2_matS <- wiqid::standardize(O2L2_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-
-jdataL1L1 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbtL1_mat, 
-    climvar3 = minsbtL1_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2L1_matS, O2c = o2L1_matS)
-str(jdataL1L1)
-
-wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
-            "betapsiO2", "betaphiO2", "betagamO2")
-
-# psi.meansbt.phi.maxsbtL1.gam.minsbtL1
-( psi.meansbt.phi.maxsbtL1.gam.minsbtL1 <- 
-    jagsUI::jags(jdataL1L1, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL1,
-        "output/psi.meansbt.phi.maxsbtL1.gam.minsbtL1.rds")
-
-# psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2
-( psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2 <- 
-    jagsUI::jags(jdataL1L1, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2,
-        "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL1.o2.rds")
-```
-# Bundle data for JAGS & run models
-# LAG 1 for Persistence; LAG 2 for Colonization
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-o2L1_matS <- wiqid::standardize(O2L1_mat)
-o2L2_matS <- wiqid::standardize(O2L2_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-
-jdataL1L2 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbtL1_mat, 
-    climvar3 = minsbtL2_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2L1_matS, O2c = o2L2_matS)
-str(jdataL1L2)
-
-wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
-            "betapsiO2", "betaphiO2", "betagamO2")
-
-# psi.meansbt.phi.maxsbtL1.gam.minsbtL2
-( psi.meansbt.phi.maxsbtL1.gam.minsbtL2 <- 
-    jagsUI::jags(jdataL1L2, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL2,
-        "output/psi.meansbt.phi.maxsbtL1.gam.minsbtL2.rds")
-
-# psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2
-( psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2 <- 
-    jagsUI::jags(jdataL1L2, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2,
-        "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL2.o2.rds")
-
-# psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth
-jdataL1L2_depth <- jdataL1L2
-jdataL1L2_depth$O2 <- jdataL1L2$depth
-( psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth <- 
-    jagsUI::jags(jdataL1L2_depth, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth,
-  "output/psi.meansbt.depth.phi.maxsbtL1.depth.gam.minsbtL2.depth.rds")
-```
-# Bundle data for JAGS & run models
-# LAG 1 for Persistence; LAG 3 for Colonization
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
+z <- (ymatb > 0)*1
 z[z == 0] <- NA
 
 # Standardize covariates
@@ -703,38 +629,79 @@ o2L2_matS <- wiqid::standardize(O2L2_mat)
 o2L3_matS <- wiqid::standardize(O2L3_mat)
 depth_matS <- wiqid::standardize(depth_mat)
 
-jdataL1L3 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbtL1_mat, 
-    climvar3 = minsbtL3_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2L1_matS, O2c = o2L3_matS)
-str(jdataL1L3)
+jdata_L0mean.b <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
+str(jdata_L0mean.b)
+
+jdataL0L1a.b <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS)
+str(jdataL0L1a.b)
+
+jdataL0L2a.b <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS)
+str(jdataL0L2.b)
+
+jdataL0L3a.b <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS)
+str(jdataL0L3a.b)
 
 wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
             "betapsiO2", "betaphiO2", "betagamO2")
 
-# psi.meansbt.phi.maxsbtL1.gam.minsbtL2
-( psi.meansbt.phi.maxsbtL1.gam.minsbtL3 <- 
-    jagsUI::jags(jdataL1L3, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.phi.sbt.gam.sbt.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.phi.maxsbtL1.gam.minsbtL3,
-        "output/psi.meansbt.phi.maxsbtL1.gam.minsbtL3.rds")
-
-# psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2
-( psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2 <- 
-    jagsUI::jags(jdataL1L3, NULL, wanted, 
+# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b
+( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b <- 
+    jagsUI::jags(jdata_L0mean.b, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
                       n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2,
-        "output/psi.meansbt.o2.phi.maxsbtL1.o2.gam.minsbtL3.o2.rds")
+saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b.rds")
 
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b <- 
+    jagsUI::jags(jdataL0L1a.b, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b_90pct.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b <- 
+    jagsUI::jags(jdataL0L2a.b, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b <- 
+    jagsUI::jags(jdataL0L3a.b, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b.rds")
 ```
-# check model output
+# Check model output
 ```{r}
 
 psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
@@ -906,24 +873,95 @@ colext.p <- col.p - ext.p
 # colext.m <- psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$gamma - (1-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$phi)
 
 # get mean & q2.5 of posterior for col - ext by cell and year
-colext.mean.by.year = apply(colext.p, c(2,3), mean)
-colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
+# colext.mean.by.year = apply(colext.p, c(2,3), mean)
+# colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
 
 # get mean & LL of posterior for mean col - ext by cell (across years)
 colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
-colext.q1.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
-                            function(x)quantile(x, 0.01))
 colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
                             function(x)quantile(x, 0.05))
-colext.q10.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
-                            function(x)quantile(x, 0.10))
+colext.q95.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.95))
 
 # put mean col-ext by cell (across years) into a dataframe for mapping
 colext <- ymat_gridnames %>%
   mutate(colext.mean = colext.mean.all.years,
-         colext.q1 = colext.q1.all.years,
          colext.q5 = colext.q5.all.years,
-         colext.q10 = colext.q10.all.years,
+         colext.q95 = colext.q95.all.years,
+         grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext)
+
+# map modelled mean col-ext for 1983-2014
+colext %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = colext.mean),
+              color = "black") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q5>0),
+               shape = "+") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q95<0),
+               shape = "-") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean colonization - extinction\n(1983-2014)") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/dynocc/scallop_dynocc_predicted_colext.png",
+        height = 5, width = 5, dpi = 400)
+```
+# Bonanza (top 90% or 95%) model: Map mean colonization - extinction by patch
+```{r}
+psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b.rds")
+
+# get posteriors for colonization (by cell and year)
+col.p <- 
+  psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$gamma
+
+# get posteriors for extinction (by cell and year)
+ext.p <-
+  1-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$phi
+
+# get posteriors for col - ext (by cell and year)
+colext.p <- col.p - ext.p
+
+# to check that apply worked right
+# colext.m <- psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$gamma - (1-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$phi)
+
+# get mean & q2.5 of posterior for col - ext by cell and year
+# colext.mean.by.year = apply(colext.p, c(2,3), mean)
+# colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
+colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+colext.q95.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.95))
+
+# put mean col-ext by cell (across years) into a dataframe for mapping
+colext <- ymat_gridnames %>%
+  mutate(colext.mean = colext.mean.all.years,
+         colext.q5 = colext.q5.all.years,
+         colext.q95 = colext.q95.all.years,
          grid_lat = as.numeric(substr(grid, 1,5)),
          grid_lon = as.numeric(substr(grid, 6,11)),
          lat = grid_lat,
@@ -941,7 +979,10 @@ colext %>%
               color = "black") +
     geom_point(aes(x = lon, y = lat),
                data = filter(colext, colext.q5>0),
-               shape = "x") +
+               shape = "+") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q95<0),
+               shape = "-", color = "black") +
     geom_sf(data = state_bounds, aes(), color = "gray",
             size = .25) +  theme_bw() +
     theme(text = element_text(size = 15),
@@ -957,7 +998,7 @@ colext %>%
     theme(text = element_text(size = 14),
           title = element_text(size = 12, hjust = 0.5))
 
-ggsave("figures/dynocc/scallop_dynocc_predicted_colext.png",
+ggsave("figures/dynocc/scallop_dynocc_predicted_colext_95pct.png",
         height = 5, width = 5, dpi = 400)
 ```
 # map scallop abundance (1983-1997) & (1999-2014)
@@ -1037,6 +1078,144 @@ ggsave("figures/dynocc/obsdens80_1999_2014.png",
 
 
 ```
+# plot predicted N over time
+```{r}
+plot(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$mean$N, 
+     type = "l")
+
+N.plot <- data.frame(
+  year = 1983:2014,
+  N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$mean$N,
+  q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$q2.5$N,
+  q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$q97.5$N,
+  q10 = apply(
+    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$N, 2,
+    function(x)quantile(x, 0.1)),
+  q90 = apply(
+    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$N, 2,
+    function(x)quantile(x, 0.9)),
+  type = "Abundant 80mm+") %>%
+  bind_rows(
+    data.frame(
+  N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$N,
+  year = 1983:2014,
+  q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$N,
+  q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$N,
+  q10 = apply(
+    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
+    function(x)quantile(x, 0.1)),
+  q90 = apply(
+    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
+    function(x)quantile(x, 0.9)),
+  type = "Any 80mm+")
+)
+
+N.plot %>%
+  ggplot() +
+  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5,
+                  fill = type, group = type),
+              alpha = 0.25) +
+  geom_ribbon(aes(x = year, ymin = q10, ymax = q90,
+                  fill = type),
+              alpha = 0.25) +
+  geom_line(aes(x = year, y = N, color = type, group = type),
+            size = 1) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  labs(fill = "", color = "",
+       y = "No. occupied cells (out of 120)",
+       x = "") +
+  theme_bw()
+
+ggsave("figures/dynocc/no_occ_patches.png",
+       height = 4, width = 5, dpi = 400)
+
+
+```
+# plot col-ext - bivariate surface vs SBT and O2
+```{r}
+mod <- psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
+
+# find a typical value for phi intercept
+mod$mean$phiInt
+median(mod$mean$phiInt)
+# year 23 is median phi annual intercept
+
+# find a typical value for gam intercept
+mod$mean$gamInt
+median(mod$mean$gamInt)
+# year 15 is median phi annual intercept; year 23 is close
+
+O2pred <- seq(min(dat_train_dens80_occ$O2L1), 
+              max(dat_train_dens80_occ$O2L1),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2L1_mat)
+
+meanSBTpred <- seq(min(dat_train_dens80_occ$mean_tempL1), 
+              max(dat_train_dens80_occ$mean_tempL1),
+              length.out = 100)
+
+phipred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+phipred[o,s] <- plogis(
+  qlogis(mod$mean$phiInt[23]) + 
+    (mod$mean$betaphiO2 * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mod$mean$Topt2)/mod$mean$width2)^2)
+}
+}
+
+gampred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+gampred[o,s] <- plogis(
+  qlogis(mod$mean$gamInt[15]) + 
+    (mod$mean$betagamO2 * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mod$mean$Topt3)/mod$mean$width3)^2)
+}
+}
+
+colext.mat <- gampred - (1-phipred)
+
+colext.mat.df <- colext.mat %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "colext") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+colext.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = colext)) +  
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(pres/n)>=0.8),
+             aes(y = O2, x = mean_temp),
+             color = "darkgray", 
+             fill = "transparent", 
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_train_dens80_occ, n>=5,(presb/n)>=0.8),
+             aes(y = O2, x = mean_temp),
+             color = "darkgray", 
+             fill = "red", 
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temp. (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Colonization rate - extinction rate\nfor a typical year (1983-2014)") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave("figures/dynocc/colext_bivariate_sbt_o2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+```
+
 
 
 
