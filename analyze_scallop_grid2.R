@@ -59,12 +59,12 @@ custom_grid_vector = c("35.5-74.5", "36.5-74.5", "36.5-75.5", "37.5-74.5",
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # 
+T_dep_mortality = 1 # 
 T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
-btemp_meas <- "mean" # "min", "mean", "max", or "O2"
+btemp_meas <- "max" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -599,7 +599,7 @@ stan_data <- list(
   run_forecast=run_forecast
 )
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221110a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221019c.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221103c.rds"))
 
 warmups <- 1000
 total_iterations <- 2000

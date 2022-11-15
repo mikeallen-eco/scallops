@@ -1,9 +1,15 @@
 functions {
 
-  real T_dep(real sbt, real Tbeta0, real Tbeta){
+  real T_dep_rec(real sbt, real Tbeta0rec, real Tbetarec){
   // real T_dep(real sbt, real Topt, real width){
     // return exp(-0.5 * ((sbt - Topt)/width)^2); // gaussian temperature-dependent function
-    return 1/(1+exp(-(Tbeta0 + Tbeta*sbt)));
+    return 1/(1+exp(-(Tbeta0rec + Tbetarec*sbt)));
+  }
+  
+  real T_dep_mort(real sbt, real Tbeta0mort, real Tbetamort){
+  // real T_dep(real sbt, real Topt, real width){
+    // return exp(-0.5 * ((sbt - Topt)/width)^2); // gaussian temperature-dependent function
+    return 1/(1+exp(-(Tbeta0mort + Tbetamort*sbt)));
   }
   
   matrix age_at_length_key(real loo, real l0, real k, real cv, int n_lbins, int n_ages){
@@ -190,7 +196,9 @@ parameters{
 
 transformed parameters{
   
-  real T_adjust[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
+  real T_adjust_rec[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
+  
+  real T_adjust_mort[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
   
   real length_50_sel;
   
@@ -277,15 +285,29 @@ transformed parameters{
    // print("sigma_obs is ", sigma_obs);
    // print("sigma_r is ", sigma_r);
   
+  if(T_dep_recruitment == 1){
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
     for(y in 1:ny_train){
-      T_adjust[p,y] = T_dep(sbt[p,y], Tbeta0, Tbeta);
+      T_adjust_rec[p,y] = T_dep_rec(sbt[p,y], Tbeta0rec, Tbetarec);
       // T_adjust[p,y] = T_dep(sbt[p,y], Topt, width);  
       // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
 
     } // close years
   } // close patches
+} // close if T_dep_recruitment == 1
+
+  if(T_dep_mortality == 1){
+  // calculate temperature-dependence correction factor for each patch and year depending on sbt
+  for(p in 1:np){
+    for(y in 1:ny_train){
+      T_adjust_mort[p,y] = T_dep_mort(sbt[p,y], Tbeta0mort, Tbetamort);
+      // T_adjust[p,y] = T_dep(sbt[p,y], Topt, width);  
+      // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
+
+    } // close years
+  } // close patches
+} // close if T_dep_mortality == 1
 
   // print("Topt is ",Topt);
   // print("width is ", width)
@@ -487,9 +509,13 @@ model {
   
   // width ~ normal(4, 2); 
   
-  Tbeta0 ~ normal(0, 5);
+  Tbeta0rec ~ normal(0, 5);
   
-  Tbeta ~ normal(0, 5);
+  Tbetarec ~ normal(0, 5);
+  
+  Tbeta0mort ~ normal(0, 5);
+  
+  Tbetamort ~ normal(0, 5);
   
   // log_sigma_r ~ normal(log(.5),.1); // process error prior
   
@@ -572,7 +598,8 @@ model {
 
 generated quantities {
   real proj_n_p_a_y_hat[np, n_ages, ny_proj+1];
-  real T_adjust_proj[np, ny_proj];
+  real T_adjust_rec_proj[np, ny_proj];
+  real T_adjust_mort_proj[np, ny_proj];
   vector[ny_proj] rec_dev_proj;
   vector[ny_proj] raw_proj;
   real surv_proj[n_ages, (ny_proj+1)];
@@ -585,7 +612,14 @@ generated quantities {
   if(run_forecast==1){
   for(p in 1:np){
     for(y in 1:ny_proj){
-      T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Tbeta0, Tbeta);
+      T_adjust_rec_proj[p,y] = T_dep(sbt_proj[p,y], Tbeta0rec, Tbetarec);
+      // T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Topt, width);
+    } // close years
+  } // close patches
+  
+    for(p in 1:np){
+    for(y in 1:ny_proj){
+      T_adjust_mort_proj[p,y] = T_dep(sbt_proj[p,y], Tbeta0mort, Tbetamort);
       // T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Topt, width);
     } // close years
   } // close patches
@@ -600,11 +634,11 @@ generated quantities {
         if(T_dep_mortality==1){
           	if(y==1){
 
-	  surv_proj[a,1] = exp(-(f_proj[a,1] + m))* T_adjust[p,ny_train];
+	  surv_proj[a,1] = exp(-(f_proj[a,1] + m))* T_adjust_mort[p,ny_train];
 
 	            } else {
 
-          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_proj[p,y-1];
+          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_mort_proj[p,y-1];
           
 	            } // close ifelse year==1 section within T_dep_mortality==1 section
 
@@ -631,7 +665,7 @@ generated quantities {
     for(p in 1:np){
 
       if(T_dep_recruitment==1){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_rec_proj[p,y-1];
       }
       if(T_dep_recruitment==0){
         proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2);
