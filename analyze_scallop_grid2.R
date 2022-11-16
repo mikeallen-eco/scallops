@@ -630,7 +630,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116b.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221116a.rds"))
 
 warmups <- 1000
@@ -701,7 +701,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221111a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221116b.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221103a.rds"))
 
 # assess how many divergent transitions in each chain
@@ -744,6 +744,8 @@ T_adjust = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
 T_adjust_proj = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
+O2beta0 = rstan::extract(stan_model_fit, "O2beta0")$O2beta0,
+O2beta = rstan::extract(stan_model_fit, "O2beta")$O2beta,
 Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
 width = rstan::extract(stan_model_fit, "width")$width,
 dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
@@ -751,10 +753,12 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221110a.rds")
+saveRDS(post, "results/stan_model_posts_run20221116b.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2beta0")$O2beta0, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2beta")$O2beta, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta")$Tbeta, c(0.025, 0.5, 0.975))
 apply(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))
