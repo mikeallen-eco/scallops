@@ -1,15 +1,7 @@
 functions {
-
-  real T_dep_rec(real sbt, real Tbeta0rec, real Tbetarec){
-  // real T_dep(real sbt, real Topt, real width){
-    // return exp(-0.5 * ((sbt - Topt)/width)^2); // gaussian temperature-dependent function
-    return 1/(1+exp(-(Tbeta0rec + Tbetarec*sbt)));
-  }
   
-  real T_dep_mort(real sbt, real Tbeta0mort, real Tbetamort){
-  // real T_dep(real sbt, real Topt, real width){
-    // return exp(-0.5 * ((sbt - Topt)/width)^2); // gaussian temperature-dependent function
-    return 1/(1+exp(-(Tbeta0mort + Tbetamort*sbt)));
+  real T_dep(real sbt, real Topt, real width){
+    return exp(-0.5 * ((sbt - Topt)/width)^2); // gaussian temperature-dependent function
   }
   
   matrix age_at_length_key(real loo, real l0, real k, real cv, int n_lbins, int n_ages){
@@ -71,6 +63,10 @@ data {
   real sbt[np, ny_train]; // temperature data for training
   
   real sbt_proj[np, ny_proj];
+  
+  real O2[np, ny_train]; // O2 data for training
+  
+  real O2_proj[np, ny_proj];
   
   // fish data
   
@@ -164,17 +160,13 @@ parameters{
   
   real<lower = 1e-3> sigma_obs;
   
-  real Tbeta0rec;
+  real<lower=1e-3> width; // sensitivity to temperature variation
   
-  real Tbetarec;
+  real Topt; //  temp at which recruitment is maximized
   
-  real Tbeta0mort;
+  real O2beta0; // intercept for logistic O2 function
   
-  real Tbetamort;
-
-  // real<lower=1e-3> width; // sensitivity to temperature variation
-
-  // real Topt; //  temp at which recruitment is maximized
+  real O2beta; // slope for logistic O2 function
   
   // real<lower = -1, upper = 1> alpha; // autocorrelation term
   
@@ -200,9 +192,7 @@ parameters{
 
 transformed parameters{
   
-  real T_adjust_rec[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
-  
-  real T_adjust_mort[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
+  real T_adjust[np, ny_train]; // tuning parameter for sbt suitability in each patch*year
   
   real length_50_sel;
   
@@ -289,34 +279,17 @@ transformed parameters{
    // print("sigma_obs is ", sigma_obs);
    // print("sigma_r is ", sigma_r);
   
-  if(T_dep_recruitment == 1){
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
     for(y in 1:ny_train){
-      T_adjust_rec[p,y] = T_dep_rec(sbt[p,y], Tbeta0rec, Tbetarec);
-      // T_adjust[p,y] = T_dep(sbt[p,y], Topt, width);  
+      T_adjust[p,y] = T_dep(sbt[p,y], Topt, width) * inv_logit(O2beta0 + O2beta*O2[p,y]);  
       // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
 
     } // close years
   } // close patches
-} // close if T_dep_recruitment == 1
-
-  if(T_dep_mortality == 1){
-  // calculate temperature-dependence correction factor for each patch and year depending on sbt
-  for(p in 1:np){
-    for(y in 1:ny_train){
-      T_adjust_mort[p,y] = T_dep_mort(sbt[p,y], Tbeta0mort, Tbetamort);
-      // T_adjust[p,y] = T_dep(sbt[p,y], Topt, width);  
-      // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
-
-    } // close years
-  } // close patches
-} // close if T_dep_mortality == 1
 
   // print("Topt is ",Topt);
   // print("width is ", width)
-  // print("Tbeta is ", Tbeta)
-  // print("Tbeta0 is ", Tbeta0)
 
   // calculate total annual mortality from instantaneous natural + fishing mortality data 
   // note that z is the proportion that survive, 1-z is the proportion that die 
@@ -326,7 +299,7 @@ transformed parameters{
       for(y in 1:ny_train){
         
         if(T_dep_mortality==1){
-          surv[p,a,y] = exp(-(f[a,y] + m)) * T_adjust_mort[p,y];
+          surv[p,a,y] = exp(-(f[a,y] + m)) * T_adjust[p,y];
         }
         
         if(T_dep_mortality==0){
@@ -345,7 +318,7 @@ transformed parameters{
 
         if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
           //n_p_a_y_hat[p,a,1] = mean_recruits * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
-          n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust_rec[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
+          n_p_a_y_hat[p,a,1] = mean_recruits[p] * T_adjust[p,1] * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
         }
         if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
           //n_p_a_y_hat[p,a,1] = mean_recruits * exp(raw[1] - pow(sigma_r,2) / 2); // initialize age 0 with mean recruitment in every patch
@@ -355,7 +328,7 @@ transformed parameters{
           n_p_a_y_hat[p,a,1] = r0 * 0.1; // scale it down a bit -- historical fishing was still occurring
         }
         if(T_dep_recruitment==1 && spawner_recruit_relationship==1){
-          n_p_a_y_hat[p,a,1] = r0 * 0.1 * T_adjust_rec[p,1];
+          n_p_a_y_hat[p,a,1] = r0 * 0.1 * T_adjust[p,1];
         }
       } // close age==1 case
       else{
@@ -388,7 +361,7 @@ transformed parameters{
       
       if(T_dep_recruitment==1 && spawner_recruit_relationship==0){
         //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
-        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust_rec[p,y-1];
+        n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev[y-1] - pow(sigma_r,2)/2) * T_adjust[p,y-1];
       }
       if(T_dep_recruitment==0 && spawner_recruit_relationship==0){
         //n_p_a_y_hat[p,1,y] = mean_recruits * exp(rec_dev[y-1] - pow(sigma_r,2)/2) ;
@@ -399,7 +372,7 @@ transformed parameters{
         n_p_a_y_hat[p,1,y] = (0.8 * r0 * h * ssb[p, y-1]) / (0.2 * ssb0 * (1-h) + ssb0 * (h - 0.2));
       }
       if(T_dep_recruitment==1 && spawner_recruit_relationship==1){
-        n_p_a_y_hat[p,1,y] = ((0.8 * r0 * h * ssb[p, y-1]) / (0.2 * ssb0 * (1-h) + ssb0 * (h - 0.2))) * T_adjust_rec[p,y-1];
+        n_p_a_y_hat[p,1,y] = ((0.8 * r0 * h * ssb[p, y-1]) / (0.2 * ssb0 * (1-h) + ssb0 * (h - 0.2))) * T_adjust[p,y-1];
       }
       // 
       // why estimate raw and sigma_r? we want to estimate process error
@@ -509,17 +482,13 @@ model {
     log_r0 ~ normal(15,5);
   }
   
-  // Topt ~ normal(9, 3);
+  Topt ~ normal(9, 3);
   
-  // width ~ normal(4, 2); 
+  width ~ normal(4, 2); 
   
-  Tbeta0rec ~ normal(0, 5);
-  
-  Tbetarec ~ normal(0, 5);
-  
-  Tbeta0mort ~ normal(0, 5);
-  
-  Tbetamort ~ normal(0, 5);
+  O2beta0 ~ normal(0, 1.4);
+
+  O2beta ~ normal(0, 5);
   
   // log_sigma_r ~ normal(log(.5),.1); // process error prior
   
@@ -602,8 +571,7 @@ model {
 
 generated quantities {
   real proj_n_p_a_y_hat[np, n_ages, ny_proj+1];
-  real T_adjust_rec_proj[np, ny_proj];
-  real T_adjust_mort_proj[np, ny_proj];
+  real T_adjust_proj[np, ny_proj];
   vector[ny_proj] rec_dev_proj;
   vector[ny_proj] raw_proj;
   real surv_proj[n_ages, (ny_proj+1)];
@@ -616,15 +584,7 @@ generated quantities {
   if(run_forecast==1){
   for(p in 1:np){
     for(y in 1:ny_proj){
-      T_adjust_rec_proj[p,y] = T_dep_rec(sbt_proj[p,y], Tbeta0rec, Tbetarec);
-      // T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Topt, width);
-    } // close years
-  } // close patches
-  
-    for(p in 1:np){
-    for(y in 1:ny_proj){
-      T_adjust_mort_proj[p,y] = T_dep_mort(sbt_proj[p,y], Tbeta0mort, Tbetamort);
-      // T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Topt, width);
+      T_adjust_proj[p,y] = T_dep(sbt_proj[p,y], Topt, width) * inv_logit(O2beta0 + O2beta*O2[p,y]);
     } // close years
   } // close patches
 
@@ -638,11 +598,11 @@ generated quantities {
         if(T_dep_mortality==1){
           	if(y==1){
 
-	  surv_proj[a,1] = exp(-(f_proj[a,1] + m))* T_adjust_mort[p,ny_train];
+	  surv_proj[a,1] = exp(-(f_proj[a,1] + m))* T_adjust[p,ny_train];
 
 	            } else {
 
-          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_mort_proj[p,y-1];
+          surv_proj[a,y] = exp(-(f_proj[a,y] + m))* T_adjust_proj[p,y-1];
           
 	            } // close ifelse year==1 section within T_dep_mortality==1 section
 
@@ -669,7 +629,7 @@ generated quantities {
     for(p in 1:np){
 
       if(T_dep_recruitment==1){
-        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_rec_proj[p,y-1];
+        proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2) * T_adjust_proj[p,y-1];
       }
       if(T_dep_recruitment==0){
         proj_n_p_a_y_hat[p,1,y] = mean_recruits[p] * exp(rec_dev_proj[y-1] - pow(sigma_r,2)/2);

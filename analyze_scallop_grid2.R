@@ -59,12 +59,12 @@ custom_grid_vector = c("35.5-74.5", "36.5-74.5", "36.5-75.5", "37.5-74.5",
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 1 # 
+T_dep_mortality = 0 # 
 T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
 time_varying_f = TRUE
-btemp_meas <- "max" # "min", "mean", "max", or "O2"
+btemp_meas <- "mean" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -195,19 +195,19 @@ dat_lengths80 <- dat %>%
 # subset appropriate climate variable (e.g., SBT min, mean, or max)
 if(btemp_meas == "mean"){
   clim_avg <- clim_avg %>%
-    select(grid, year, mean_temp) %>%
+    select(grid, year, O2, mean_temp) %>%
     rename(climvar = mean_temp)
 }
 
 if(btemp_meas == "min"){
   clim_avg <- clim_avg %>%
-    select(grid, year, min_temp) %>%
+    select(grid, year, O2, min_temp) %>%
     rename(climvar = min_temp)
 }
 
 if(btemp_meas == "max"){
   clim_avg <- clim_avg %>%
-    select(grid, year, max_temp) %>%
+    select(grid, year, O2, max_temp) %>%
     rename(climvar = max_temp)
 }
 
@@ -250,20 +250,23 @@ dat_dens80 <- dat %>%
   # add in lagged sea bottom temperature
   dat_dens <- dat_dens %>%
     arrange(grid, year) %>%
-    mutate(lclimvar = lag(climvar)) %>%
+    mutate(lclimvar = lag(climvar),
+           lO2 = lag(O2)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
   # add in lagged sea bottom temperature (for version without small scallops < 80 mm)
   dat_dens80 <- dat_dens80 %>%
     arrange(grid, year) %>%
-    mutate(lclimvar = lag(climvar)) %>%
+    mutate(lclimvar = lag(climvar),
+           lO2 = lag(O2)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
   # plot to see which patches were selected
 dat_dens %>%
     group_by(grid, patch) %>%
     summarise(mean_dens = mean(mean_dens, na.rm = T),
-              climvar = mean(climvar, na.rm = T)) %>%
+              climvar = mean(climvar, na.rm = T),
+              O2 = mean(O2)) %>%
     mutate(grid_lat = substr(grid, 1, 5),
            grid_lon = as.numeric(substr(grid, 6, 11))) %>%
   ggplot() +
@@ -276,7 +279,8 @@ dat_dens %>%
 dat_dens80 %>%
   group_by(grid, patch) %>%
   summarise(mean_dens = mean(mean_dens, na.rm = T),
-            climvar = mean(climvar, na.rm = T)) %>%
+            climvar = mean(climvar, na.rm = T),
+            O2 = mean(O2, na.rm = T)) %>%
   mutate(grid_lat = substr(grid, 1, 5),
          grid_lon = as.numeric(substr(grid, 6, 11))) %>%
   ggplot() +
@@ -452,17 +456,17 @@ if(time_varying_f==TRUE){
 
 # make matrices/arrays from dfs
 len <- array(0, dim = c(np, n_lbins, ny)) 
-for(p in 1:np){
-  print(p)
-  for(l in 1:n_lbins){
-    for(y in 1:ny){
-      tmp <- dat_train_lengths %>% filter(patch==p, round(length)==lbins[l], year==y) 
-      if (nrow(tmp) > 0){
-        len[p,l,y] <- tmp$sum_num_at_length
-      }
-    }
-  }
-}
+# for(p in 1:np){
+#   print(p)
+#   for(l in 1:n_lbins){
+#     for(y in 1:ny){
+#       tmp <- dat_train_lengths %>% filter(patch==p, round(length)==lbins[l], year==y) 
+#       if (nrow(tmp) > 0){
+#         len[p,l,y] <- tmp$sum_num_at_length
+#       }
+#     }
+#   }
+# }
 
 plot(len[20,,20])
 
@@ -476,7 +480,17 @@ for(p in 1:np){
   }
 }
 
-# create climate variable array for Stan (called sbt but could be o2 as well)
+# create O2 array for Stan
+O2 <- array(NA, dim=c(np,ny))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny){
+    tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
+    O2[p,y] <- tmp3$O2
+  }
+}
+
+# create climate variable array for Stan
 sbt <- array(NA, dim=c(np,ny))
 for(p in 1:np){
   print(p)
@@ -507,6 +521,17 @@ dens_notNA[which(is.na(sbt))] <- 0
 dens[is.na(dens)] <- 999999
 sbt[is.na(sbt)] <- 999999
 
+O2_proj <- array(NA, dim=c(np,ny_proj))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny_proj){
+    tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+    if(nrow(tmp6) != 0){
+      O2_proj[p,y] <- tmp6$O2
+    }
+  }
+}
+
 sbt_proj <- array(NA, dim=c(np,ny_proj))
 for(p in 1:np){
   print(p)
@@ -532,8 +557,13 @@ if(lagged_sbt == 1){
 }
 } # close if lagged_sbt = 1
 
+O2_proj[is.na(O2_proj)] <- mean(O2_proj, na.rm = T) # temporary; no density data for these obs
 sbt_proj[is.na(sbt_proj)] <- mean(sbt_proj, na.rm = T) # temporary; no density data for these obs
                                                       # fix if mapping projected dens is desired
+
+# standardize O2 data
+O2S <- wiqid::standardize(O2)
+O2_projS <- wiqid::standardize(O2_proj)
 
 f <- array(NA, dim=c(n_ages,ny))
 for(a in min_age:max_age){
@@ -577,6 +607,8 @@ stan_data <- list(
   selectivity_at_bin = selectivity_at_bin,
   sbt = sbt,
   sbt_proj=sbt_proj,
+  O2 = O2S,
+  O2_proj=O2_projS,
   m=m,
   f=f,
   f_proj=f_proj,
@@ -598,8 +630,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221110a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221103c.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221116a.rds"))
 
 warmups <- 1000
 total_iterations <- 2000
@@ -624,7 +656,7 @@ raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825,
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)#[2:25]
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -669,7 +701,7 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003.st
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221110a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221111a.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221103a.rds"))
 
 # assess how many divergent transitions in each chain
