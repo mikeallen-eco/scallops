@@ -1,0 +1,182 @@
+# visualize DRM covariate effects
+
+# load packages and data
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+rmeanO2 <- readRDS("results/stan_model_posts_run20221116a.rds")
+mmeanO2 <- readRDS("results/stan_model_posts_run20221116b.rds")
+
+O2pred <- seq(min(O2), max(O2),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2)
+
+meanSBTpred <- seq(min(sbt), max(sbt),
+              length.out = 100)
+```
+# Bivariate plot of mean SBT and O2 effects on recruitment 
+rmeanO2 model
+```{r}
+T_adjust_rec_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+T_adjust_rec_pred[o,s] <- plogis(
+  mean(rmeanO2$O2beta0) + 
+    (mean(rmeanO2$O2beta) * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mean(rmeanO2$Topt))/mean(rmeanO2$width))^2)
+}
+}
+
+T_adjust_rec.mat.df <- T_adjust_rec_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens40$mean_dens, 0.95, na.rm = T) # 3.154
+quantile(dat_dens40$mean_dens, 0.99, na.rm = T) # 26.735
+
+# plot
+T_adjust_rec.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens40, mean_dens > 3.15),
+             aes(y = O2, x = climvar),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens40, mean_dens >= 26.735),
+             aes(y = O2, x = climvar),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temp. (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Recruitment suitability (0-1) based on the DRM") + 
+    scale_fill_gradient2(midpoint = 0.75,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave("figures/rmeanO2/rec_Tadust_bivariate_sbt_o2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+```
+# Bivariate plot of mean SBT and O2 effects on mortality
+mmeanO2 model
+```{r}
+T_adjust_mort_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+T_adjust_mort_pred[o,s] <- plogis(
+  mean(mmeanO2$O2beta0) + 
+    (mean(mmeanO2$O2beta) * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mean(mmeanO2$Topt))/mean(mmeanO2$width))^2)
+}
+}
+
+T_adjust_mort.mat.df <- T_adjust_mort_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of older scallops
+quantile(dat_dens80$mean_dens, 0.95, na.rm = T) # 87.1233
+quantile(dat_dens80$mean_dens, 0.99, na.rm = T) # 370.6929
+
+# plot
+T_adjust_mort.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens >= 87.123),
+             aes(y = O2, x = climvar),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 370.6929),
+             aes(y = O2, x = climvar),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temp. (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Survival suitability (0-1) based on the DRM") + 
+    scale_fill_gradient2(midpoint = 0.75,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave("figures/mmeanO2/mort_Tadust_bivariate_sbt_o2_mmeanO2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+```
+# Map mean survival suitability by patch
+```{r}
+# get posteriors for recruitment T_adjust (by cell and year)
+ta <- apply(mmeanO2$T_adjust, c(2,3), mean)
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+ta.mean.all.years = apply(apply(mmeanO2$T_adjust, 
+                                    c(1,2), mean), 2, mean)
+ta.q5.all.years = apply(apply(mmeanO2$T_adjust, 
+                                  c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+
+# put mean t_adjust by cell (across years) into a dataframe for mapping
+ta.df <- data.frame(grid = unique(dat_train_dens$grid)) %>%
+  mutate(ta.mean = ta.mean.all.years,
+         ta.q5 = ta.q5.all.years,
+         grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df)
+
+# map modelled mean col-ext for 1983-2014
+ta.df %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta.mean),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean survival suitability (0-1)") + 
+    scale_fill_gradient2(midpoint = 0.75,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/mmeanO2/scallop_rec_tadjust_predicted_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+```
