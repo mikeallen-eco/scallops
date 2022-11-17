@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-# plotsave <- "results/run20221024a"
+# plotsave <- "results/run20221116c"
 
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
@@ -59,7 +59,7 @@ custom_grid_vector = c("35.5-74.5", "36.5-74.5", "36.5-75.5", "37.5-74.5",
 manual_selectivity = 1
 do_dirichlet = 1
 eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
-T_dep_mortality = 0 # 
+T_dep_mortality = 1 # 
 T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=1
@@ -630,8 +630,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116b.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221116a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116c.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221116b.rds"))
 
 warmups <- 1000
 total_iterations <- 2000
@@ -656,7 +656,7 @@ raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825,
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)#[2:25]
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2both.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -701,8 +701,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221116b.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221103a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221116c.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221116c.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -740,25 +740,35 @@ launch_shinystan(stan_model_fit)
 summary(stan_model_fit)$summary$Rhat
 
 post <- list(
-T_adjust = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
-T_adjust_proj = rstan::extract(stan_model_fit, "T_adjust")$T_adjust,
+T_adjust_rec = rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec,
+T_adjust_rec_proj = rstan::extract(stan_model_fit, "T_adjust_rec_proj")$T_adjust_rec_proj,
+T_adjust_mort = rstan::extract(stan_model_fit, "T_adjust_mort")$T_adjust_mort,
+T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adjust_mort_proj,
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
-O2beta0 = rstan::extract(stan_model_fit, "O2beta0")$O2beta0,
-O2beta = rstan::extract(stan_model_fit, "O2beta")$O2beta,
-Topt = rstan::extract(stan_model_fit, "Topt")$Topt,
-width = rstan::extract(stan_model_fit, "width")$width,
+O2beta0rec = rstan::extract(stan_model_fit, "O2beta0rec")$O2beta0rec,
+O2betarec = rstan::extract(stan_model_fit, "O2betarec")$O2betarec,
+O2beta0mort = rstan::extract(stan_model_fit, "O2beta0mort")$O2beta0mort,
+O2betamort = rstan::extract(stan_model_fit, "O2betamort")$O2betamort,
+Topt_rec = rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec,
+width_rec = rstan::extract(stan_model_fit, "width_rec")$width_rec,
+Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
+width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort,
 dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
 proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221116b.rds")
+saveRDS(post, "results/stan_model_posts_run20221116c.rds")
 
-quantile(rstan::extract(stan_model_fit, "Topt")$Topt, c(0.025, 0.5, 0.975))
-quantile(rstan::extract(stan_model_fit, "width")$width, c(0.025, 0.5, 0.975))
-quantile(rstan::extract(stan_model_fit, "O2beta0")$O2beta0, c(0.025, 0.5, 0.975))
-quantile(rstan::extract(stan_model_fit, "O2beta")$O2beta, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "width_rec")$width_rec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "width_mort")$width_mort, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2beta0rec")$O2beta0rec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2betarec")$O2betarec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2beta0mort")$O2beta0mort, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "O2betamort")$O2betamort, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta")$Tbeta, c(0.025, 0.5, 0.975))
 apply(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))
@@ -782,40 +792,71 @@ for(i in 1:np){
 }
 rm(test)
 
-# Plot Topt/width posterior predictive distribution
-topt_plot = rstan::extract(stan_model_fit, c("Topt", "width"))
-lowersbt <- median(topt_plot$Topt)-3*median(topt_plot$width)
-uppersbt <- median(topt_plot$Topt)+3*median(topt_plot$width)
+# Plot Topt/width posterior predictive distribution (Recruitment)
+topt_rec_plot = rstan::extract(stan_model_fit, c("Topt_rec", "width_rec"))
+lowersbt <- median(topt_rec_plot$Topt_rec)-3*median(topt_rec_plot$width_rec)
+uppersbt <- median(topt_rec_plot$Topt_rec)+3*median(topt_rec_plot$width_rec)
 
-topt_plot2 <- data.frame(
-  t_adjust = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - median(topt_plot$Topt))/median(topt_plot$width))^2),
+topt_rec_plot2 <- data.frame(
+  t_adjust_rec = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - median(topt_rec_plot$Topt_rec))/median(topt_rec_plot$width_rec))^2),
   temp = seq(lowersbt,uppersbt, by = .5))
 
-topt_plot3_CI = lapply(sample(1:600, size = 200,replace = F), function(x){
+topt_rec_plot3_CI = lapply(sample(1:600, size = 200,replace = F), function(x){
   data.frame(temp = seq(lowersbt,uppersbt, by = .5), 
-             topt = topt_plot$Topt[x], 
-             width = topt_plot$width[x],
+             topt_rec = topt_rec_plot$Topt_rec[x], 
+             width_rec = topt_rec_plot$width_rec[x],
              iter = x,
-             t_adjust = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - topt_plot$Topt[x])/topt_plot$width[x])^2))}) %>%
+             t_adjust_rec = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - topt_rec_plot$Topt_rec[x])/topt_rec_plot$width_rec[x])^2))}) %>%
   do.call(rbind, .)
 
-ggplot(topt_plot2) +
-  geom_line(aes(x = temp, y = t_adjust, group = as.factor(iter)), 
-            data = topt_plot3_CI,
+ggplot(topt_rec_plot2) +
+  geom_line(aes(x = temp, y = t_adjust_rec, group = as.factor(iter)), 
+            data = topt_rec_plot3_CI,
             color = "firebrick",
             alpha = .1) +
-  geom_line(aes(x = temp, y = t_adjust),
+  geom_line(aes(x = temp, y = t_adjust_rec),
             size = 1) +
   theme_bw() +
   theme(text = element_text(size = 14)) +
-  labs(x = "Mean montly sea bottom temperature (C)", y = "Relative adult survival") # "Recruitment suitability"
-ggsave(here(plotsave, "AAA_plot_Topt&width_curve.png"))
-rm(topt_plot, topt_plot2, topt_plot3_CI)
+  labs(x = "Mean montly sea bottom temperature (C)", y = "Recruitment suitability") # "Recruitment suitability"
+ggsave(here(plotsave, "AAA_plot_Topt&width_curve_rec.png"),
+       height = 4, width = 6, dpi = 400)
+rm(topt_rec_plot, topt_rec_plot2, topt_rec_plot3_CI)
 
 # a = rstan::extract(stan_model_fit, "theta_d")
 # hist(a$theta_d)
 # rstanarm::launch_shinystan(stan_model_fit)
 
+# Plot Topt/width posterior predictive distribution
+topt_mort_plot = rstan::extract(stan_model_fit, c("Topt_mort", "width_mort"))
+lowersbt <- median(topt_mort_plot$Topt_mort)-3*median(topt_mort_plot$width_mort)
+uppersbt <- median(topt_mort_plot$Topt_mort)+3*median(topt_mort_plot$width_mort)
+
+topt_mort_plot2 <- data.frame(
+  t_adjust_mort = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - median(topt_mort_plot$Topt_mort))/median(topt_mort_plot$width_mort))^2),
+  temp = seq(lowersbt,uppersbt, by = .5))
+
+topt_mort_plot3_CI = lapply(sample(1:600, size = 200,replace = F), function(x){
+  data.frame(temp = seq(lowersbt,uppersbt, by = .5), 
+             topt_mort = topt_mort_plot$Topt_mort[x], 
+             width_mort = topt_mort_plot$width_mort[x],
+             iter = x,
+             t_adjust_mort = exp(-0.5 * ((seq(lowersbt,uppersbt, by = .5) - topt_mort_plot$Topt_mort[x])/topt_mort_plot$width_mort[x])^2))}) %>%
+  do.call(rbind, .)
+
+ggplot(topt_mort_plot2) +
+  geom_line(aes(x = temp, y = t_adjust_mort, group = as.factor(iter)), 
+            data = topt_mort_plot3_CI,
+            color = "firebrick",
+            alpha = .1) +
+  geom_line(aes(x = temp, y = t_adjust_mort),
+            size = 1) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "Mean sea bottom temperature (C)", y = "Survival suitability") #
+ggsave(here(plotsave, "AAA_plot_Topt&width_curve_mort.png"),
+       height = 4, width = 6, dpi = 400)
+rm(topt_mort_plot, topt_mort_plot2, topt_mort_plot3_CI)
 
 # plot important parameters 
 plot(stan_model_fit, pars=c('sigma_r','sigma_obs','d','width','Topt','alpha','beta_obs','theta_d'))

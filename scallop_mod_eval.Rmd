@@ -16,6 +16,7 @@ library(tidyr)
 library(sf)
 
 # load posteriors for mean SBTemp vs. recruitment
+rmmeanO2 <- readRDS("results/stan_model_posts_run20221116c.rds")
 rmean <- readRDS("results/stan_model_posts_run20221012a.rds")
 # rmean_len <- readRDS("results/stan_model_posts_run20221031a.rds")
 # rmean_both <- readRDS("results/stan_model_posts_run20221110a.rds")
@@ -26,6 +27,425 @@ mmax <- readRDS("results/stan_model_posts_run20221019b.rds")
 rmin <- readRDS("results/stan_model_posts_run20221019c.rds") 
 mmin <- readRDS("results/stan_model_posts_run20221019d.rds") 
 null <- readRDS("results/stan_model_posts_run20221024a.rds") 
+```
+# rmmeanO2 model: Rec & Survival vs. Mean SBT & O2 - change in 10 year mean pop. est, observed; also suitability
+```{r}
+# Tdep rec vs. mean sbt
+# visualize observed vs. predicted projections of 80mm+ scallops
+
+# was going to cbind the last year of dens_p_y_hat80 but
+# it turns out it was already in there
+# might have chopped off 2014 in proj_dens_p_y_hat80 by accident
+# need to check on this in model file
+pred80_rmmeanO2 <- cbind(apply(rmmeanO2$proj_dens_p_y_hat80, 
+                               c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = 2004:2013) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+obs80_rmmeanO2 <- dat_test_dens80 %>%
+  bind_rows(filter(dat_train_dens80, year == 25)) %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea) %>%
+  filter(year != 2014)
+
+obspred_rmmeanO2 <- obs80_rmmeanO2 %>%
+  full_join(pred80_rmmeanO2, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(obspred_rmmeanO2, is.na(obs80)==F)$obs80, 
+    filter(obspred_rmmeanO2, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+obspred_rmmeanO2 %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.731") +
+  labs(x = "Obs. 80mm+ scallops / trawl",
+       y = "Pred. 80mm+ scallops / trawl",
+       color = "Year",
+       title = "Temp.-dependent recruitment (mean SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_meanSBT_rec.png", 
+# height = 4, width = 6, dpi = 400)
+
+######
+## Do the same, but for training set
+######
+# T is for training
+
+Tpred80_rmmeanO2 <- cbind(apply(rmmeanO2$dens_p_y_hat80, 
+                             c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = train_years) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+Tobs80_rmmeanO2 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+Tobspred_rmmeanO2 <- Tobs80_rmmeanO2 %>%
+  full_join(Tpred80_rmmeanO2, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+cor(filter(Tobspred_rmmeanO2, is.na(obs80)==F)$obs80, 
+    filter(Tobspred_rmmeanO2, is.na(obs80)==F)$est80, 
+    method = "spearman")
+
+# plot observed vs. predicted
+Tobspred_rmmeanO2 %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = (obs80/meanpatcharea)+1, y = (est80/meanpatcharea)+1,
+             # ggplot(aes(x = obs_lambda, y = est_lambda,
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  annotate("text", x = 500, y = 500, label = "Spearmans =\n0.760") +
+  labs(x = "Obs. 80mm+ scallops rel. abund.",
+       y = "Pred. 80mm+ scallops rel. abund.",
+       color = "Year",
+       title = "Temp.-dependent recruitment (mean SBT)") +
+  scale_y_log10(limits = c(1,1000),
+                breaks = c(1,10,100,1000)) +
+  scale_x_log10() +
+  scale_color_continuous(breaks = seq(2004,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+# ggsave("obspred_meanSBT_rec_train.png",
+# height = 4, width = 6, dpi = 400)
+
+# Map mean projected growth rate over time
+obspred_rmmeanO2  %>%
+  filter(year != 2004,
+         is.na(mean_dens)==F) %>%
+  ggplot(aes(x = grid, y = log(est_lambda))) +
+  geom_boxplot()
+
+obspred_rmmeanO2_by_grid <- obspred_rmmeanO2  %>%
+  filter(year != 2004,
+         is.na(mean_dens)==F) %>%
+  group_by(grid) %>%
+  summarize(loglambda = mean(log(est_lambda)),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+               crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(obspred_rmmeanO2_by_grid)
+
+obspred_rmmeanO2_by_grid %>%
+  ggplot(aes(x = loglambda)) +
+  geom_boxplot()
+
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = loglambda),
+            # alpha = 1,
+            data = obspred_rmmeanO2_by_grid,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean growth rate\n(log lambda)\n(2005-2014)",
+       title = "Projected scallop pop. growth rate\n(recruitment influenced by mean SBT)") + 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+ggsave("figures/rmmeanO2/projected_loglambda.png", 
+       height = 6, width = 6, dpi = 400)
+
+# get model predicted values from training set
+pred80_rmmeanO2_train <- cbind(apply(rmmeanO2$dens_p_y_hat80, 
+                                  c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = 1980:2004) %>%
+  pivot_longer(cols = V1:V37) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+obs80_rmmeanO2_train <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens * meanpatcharea)
+
+obspred_rmmeanO2_train <- obs80_rmmeanO2_train %>%
+  full_join(pred80_rmmeanO2_train, by = c("year", "patch")) %>%
+  mutate(Lest80 = lag(est80),
+         Lobs80 = lag(obs80),
+         est_lambda = est80/Lest80) %>%
+  arrange(patch, year)
+
+# check which cells have zero scallops always 
+# (35.5-75.5, 37.5-75.5, 38.5-75.5)
+test = obspred_rmmeanO2_train %>% 
+  group_by(grid) %>% 
+  summarize(presn = sum(obs80>0))
+test2 = obspred_rmmeanO2 %>% 
+  group_by(grid) %>% 
+  summarize(presn = sum(obs80>0))
+
+# create period 1
+obspred_rmmeanO2_per1 <- obspred_rmmeanO2_train  %>%
+  filter(year %in% 1995:2004,
+         is.na(mean_dens)==F) %>%
+  mutate(suit = 
+           exp(-0.5 * ((climvar - 
+                          median(rmmeanO2$Topt))/median(rmmeanO2$width))^2)) %>%
+  group_by(grid) %>%
+  summarize(obs80_per1 = mean(obs80),
+            est80_per1 = mean(est80),
+            climvar_per1 = mean(climvar),
+            suit_per1 = mean(suit),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# create period 2
+obspred_rmmeanO2_per2 <- obspred_rmmeanO2  %>%
+  filter(year %in% 2005:2013,
+         is.na(grid)==F) %>%
+  mutate(suit = 
+           exp(-0.5 * ((climvar - 
+                          median(rmmeanO2$Topt))/median(rmmeanO2$width))^2)) %>%
+  group_by(grid) %>%
+  summarize(obs80_per2 = mean(obs80),
+            est80_per2 = mean(est80),
+            climvar_per2 = mean(climvar),
+            suit_per2 = mean(suit),
+            .groups = "drop") %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# combine period 1 and 2 change data
+obspred_rmmeanO2_change <- obspred_rmmeanO2_per1 %>%
+  st_join(obspred_rmmeanO2_per2) %>%
+  mutate(obs80_chg = log10((obs80_per2)/(obs80_per1)),
+         est80_chg = log10(est80_per2/est80_per1),
+         clim_chg = climvar_per2 - climvar_per1,
+         suit_chg = suit_per2 - suit_per1) %>%
+  select(grid=grid.x, obs80_per1, obs80_per2, obs80_chg,
+         est80_per1, est80_per2, est80_chg, clim_chg, 
+         suit_per1, suit_per2, suit_chg, 
+         lat=lat.x, lon=lon.x)
+
+# map scallop abundance per 1 (1995-2004)
+(obs80_per1_plot <- 
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_per1),
+              # alpha = 1,
+              data = obspred_rmmeanO2_change,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "value",
+         title = "") + 
+    scale_fill_viridis_c(option = "inferno") +
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12)) 
+)
+
+ggsave("figures/rmmeanO2/obsdens_per1.png", 
+       height = 6, width = 6, dpi = 400)
+
+# map scallop abundance per 2 (2005-2014)
+(obs80_per2_plot <- 
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_per2),
+              # alpha = 1,
+              data = obspred_rmmeanO2_change,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "value",
+         title = "") + 
+    scale_fill_viridis_c(option = "inferno") +
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12)) 
+)
+
+ggsave("figures/rmmeanO2/obsdens_per2.png", 
+       height = 6, width = 6, dpi = 400)
+
+# map observed change in scallop abundance per 1-2
+(obs80_chg_plot <- 
+    obspred_rmmeanO2_change %>%
+    # filter(grid != "35.5-74.5",
+    #        grid != "42.5-69.5") %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = obs80_chg),
+              # alpha = 1,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "",
+         title = "Observed change in rel. abund.\nlog(2005-2014 / 1995-2004)") + 
+    # scale_fill_viridis_c(option = "inferno") +
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+ggsave("figures/rmmeanO2/obsdens_change.png", 
+       height = 6, width = 6, dpi = 400)
+
+# map estimated change in scallop abundance per 1-2
+(est80_chg_plot <- 
+    obspred_rmmeanO2_change %>%
+    # filter(grid != "35.5-74.5",
+    #        grid != "42.5-69.5") %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = est80_chg),
+              # alpha = 1,
+              color = "black") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    viridis::scale_color_viridis(option = "inferno") +
+    labs(x = "", y = "", fill = "",
+         title = "Estimated change in rel. abund.\nlog10(2005-2014 / 1995-2004)") + 
+    # scale_fill_viridis_c(option = "inferno") +
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+ggplot(obspred_rmmeanO2_change, aes(x = obs80_per2+1, 
+                                 y = est80_per2+1)) +
+  geom_point(size = 3,
+             alpha = .7) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_viridis_c(option = "inferno") +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  labs(y = "Estimated mean rel. abund. (projected, 2005-2014)",
+       x = "Observed mean rel. abund. (2005-2014)")
+
+cor(obspred_rmmeanO2_change$obs80_per2,
+    obspred_rmmeanO2_change$est80_per2,
+    method = "spearman") # 0.86
+
+ggplot(obspred_rmmeanO2_change) +
+  geom_point(size = 3,
+             alpha = .7, aes(x = obs80_chg, 
+                             y = est80_chg)) +
+  geom_smooth(aes(x = obs80_chg, 
+                  y = est80_chg), 
+              method = "lm", color = "black") +
+  scale_color_viridis_c(option = "inferno") +
+  labs(y = "Estimated change in mean rel. abund.\nlog10(2005-2014 / 1995-2004)",
+       x = "Observed change in mean rel. abund.\nlog10(2005-2014 / 1995-2004)") +
+  theme_bw()
+
+ggplot(obspred_rmmeanO2_change, aes(x = suit_chg, 
+                                 y = obs80_chg)) +
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  geom_smooth(method = "lm", color = "black") +
+  labs(x = "Change in recruitment suitability based on mean SBT",
+       y = "Observed change in rel. abund.") +
+  theme_bw()
+
+ggplot(obspred_rmmeanO2_change, aes(x = suit_chg, 
+                                 y = est80_chg)) +
+  geom_point(size = 3, alpha = .7) +
+  scale_color_viridis_c(option = "inferno") +
+  geom_smooth(method = "lm", color = "black") +
+  labs(x = "Change in recruitment suitability based on mean SBT",
+       y = "Estimated change in rel. abund.") +
+  theme_bw()
+
+
 ```
 # Rec vs. Mean SBT - change in 10 year mean pop. est, observed; also suitability
 ```{r}
