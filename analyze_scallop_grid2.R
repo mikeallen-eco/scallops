@@ -28,20 +28,28 @@ rstan_options(javascript=FALSE, auto_write =TRUE)
 # set the 
 # plotsave <- "results/run20221116c"
 
+# read in stratification data
+strat1x1 <- readRDS("processed-data/strat1x1.rds")
+strathalf <- readRDS("processed-data/strathalf.rds")
+strat <- strathalf # will rename to strat1x1 below if grid size = 1x1
+
 # read in climate data
 clim <- read.csv("processed-data/climate_formatted.csv")
-clim_avg <- clim # rename so clim can be used again if 1x1 grid spacing is used
+# rename so clim can be used again if 1x1 grid spacing is used
+clim_avg <- clim %>%
+  left_join(strathalf)
 
 #############
 # make model decisions
 #############
-train_years <- 1980:2004 # set training year range
-test_years <- 2005:2014 # set testing year range
-season <- "fall" # "spring", "fall", or "both
+train_years <- 1983:2014 # set training year range
+test_years <- 2013:2014 # set testing year range
+season <- "both" # "spring", "fall", or "both
 grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
 max_NA_dens <- 4 # set max number of NA dens values for each cell
 max_NA_sbt <- 4 # set max number of NA sbt values for each cell
-lagged_sbt <- 0 # 1 = sbt lagged 1 year; 0 = not
+lagged_sbt_rec <- 0 # 1 = sbt lagged 1 year; 0 = not
+lagged_sbt_mort <- 0 # 1 = sbt lagged 1 year; 0 = not
 impute_mean_dens <- 0 # impute missing dens values (1) or no (0)
 topn <- NULL # NULL if not using "keep only top n cells" option
 use_custom_grid = 0
@@ -62,9 +70,10 @@ eval_l_comps = 0 # evaluate length composition data? 0=no, 1=yes
 T_dep_mortality = 1 # 
 T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
-run_forecast=1
+run_forecast=0
 time_varying_f = TRUE
-btemp_meas <- "mean" # "min", "mean", "max", or "O2"
+btemp_meas_rec <- "mean" # "min", "mean", "max", or "O2"
+btemp_meas_mort <- "mean" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -117,7 +126,9 @@ if(grid_1x1 == 1){
                                   grid_lon-0.25),
            grid = paste0(grid_lat,grid_lon)) %>%
     group_by(grid, year) %>%
-    summarise(across(where(is.numeric), mean))
+    summarise(across(where(is.numeric), mean)) %>%
+    ungroup() %>%
+    left_join(strat1x1)
   
 }
 
@@ -193,28 +204,32 @@ dat_lengths80 <- dat %>%
   filter(is.na(length) == FALSE)
 
 # subset appropriate climate variable (e.g., SBT min, mean, or max)
-if(btemp_meas == "mean"){
+if(btemp_meas_rec == "mean" & btemp_meas_mort == "mean"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2, mean_temp) %>%
-    rename(climvar = mean_temp)
+    select(grid, year, O2, strat, 
+           climvar_rec = mean_temp,
+           climvar_mort = mean_temp)
 }
 
-if(btemp_meas == "min"){
+if(btemp_meas_rec == "min" & btemp_meas_mort == "max"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2, min_temp) %>%
-    rename(climvar = min_temp)
+    select(grid, year, O2, strat, 
+           climvar_rec = min_temp,
+           climvar_mort = max_temp)
 }
 
-if(btemp_meas == "max"){
+if(btemp_meas_rec == "min" & btemp_meas_mort == "min"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2, max_temp) %>%
-    rename(climvar = max_temp)
+    select(grid, year, O2, 
+           climvar_rec = min_temp,
+           climvar_mort = min_temp)
 }
 
-if(btemp_meas == "O2"){
+if(btemp_meas_rec == "max" & btemp_meas_mort == "max"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2) %>%
-    rename(climvar = O2)
+    select(grid, year, O2, 
+           climvar_rec = max_temp,
+           climvar_mort = max_temp)
 }
 
 # prep dat dens data
@@ -250,14 +265,16 @@ dat_dens80 <- dat %>%
   # add in lagged sea bottom temperature
   dat_dens <- dat_dens %>%
     arrange(grid, year) %>%
-    mutate(lclimvar = lag(climvar),
+    mutate(lclimvar_rec = lag(climvar_rec),
+           lclimvar_mort = lag(climvar_mort),
            lO2 = lag(O2)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
   # add in lagged sea bottom temperature (for version without small scallops < 80 mm)
   dat_dens80 <- dat_dens80 %>%
     arrange(grid, year) %>%
-    mutate(lclimvar = lag(climvar),
+    mutate(lclimvar_rec = lag(climvar_rec),
+           lclimvar_mort = lag(climvar_mort),
            lO2 = lag(O2)) %>%
     filter(year != (min(train_years)-1)) # this also removes all the incorrect values in year min(year)-1 that carried over from other grid cells in the lag
   
@@ -265,8 +282,8 @@ dat_dens80 <- dat %>%
 dat_dens %>%
     group_by(grid, patch) %>%
     summarise(mean_dens = mean(mean_dens, na.rm = T),
-              climvar = mean(climvar, na.rm = T),
-              O2 = mean(O2)) %>%
+              climvar_rec = mean(climvar_rec, na.rm = T),
+              O2 = mean(O2, na.rm = T)) %>%
     mutate(grid_lat = substr(grid, 1, 5),
            grid_lon = as.numeric(substr(grid, 6, 11))) %>%
   ggplot() +
@@ -279,7 +296,7 @@ dat_dens %>%
 dat_dens80 %>%
   group_by(grid, patch) %>%
   summarise(mean_dens = mean(mean_dens, na.rm = T),
-            climvar = mean(climvar, na.rm = T),
+            climvar_rec = mean(climvar_rec, na.rm = T),
             O2 = mean(O2, na.rm = T)) %>%
   mutate(grid_lat = substr(grid, 1, 5),
          grid_lon = as.numeric(substr(grid, 6, 11))) %>%
@@ -490,36 +507,70 @@ for(p in 1:np){
   }
 }
 
-# create climate variable array for Stan
-sbt <- array(NA, dim=c(np,ny))
+# create stratification array for Stan
+strat <- array(NA, dim=c(np,ny))
 for(p in 1:np){
   print(p)
   for(y in 1:ny){
     tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
-    sbt[p,y] <- tmp3$climvar
+    strat[p,y] <- tmp3$strat
   }
 }
 
-# or lagged sbt (1 yr)
-if(lagged_sbt == 1){
-sbt <- array(NA, dim=c(np,ny))
+# create recruitment bottom temp variable array for Stan
+sbt_rec <- array(NA, dim=c(np,ny))
 for(p in 1:np){
   print(p)
   for(y in 1:ny){
     tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
-    sbt[p,y] <- tmp3$lclimvar
+    sbt_rec[p,y] <- tmp3$climvar_rec
   }
 }
+
+# create recruitment bottom temp variable array for Stan
+sbt_mort <- array(NA, dim=c(np,ny))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny){
+    tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
+    sbt_mort[p,y] <- tmp3$climvar_mort
+  }
+}
+
+# and lagged sbt_rec (1 yr)
+if(lagged_sbt_rec == 1){
+sbt_rec <- array(NA, dim=c(np,ny))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny){
+    tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
+    sbt_rec[p,y] <- tmp3$lclimvar_rec
+  }
+}
+} # close if lagged_sbt = 1
+
+# and lagged sbt_mort (1 yr)
+if(lagged_sbt_mort == 1){
+  sbt_mort <- array(NA, dim=c(np,ny))
+  for(p in 1:np){
+    print(p)
+    for(y in 1:ny){
+      tmp3 <- dat_train_dens %>% filter(patch==p, year==y) 
+      sbt_mort[p,y] <- tmp3$lclimvar_mort
+    }
+  }
 } # close if lagged_sbt = 1
 
 # make matrix identifying NA locations within dens or sbt
 dens_notNA <- array(1, dim(dens))
 dens_notNA[which(is.na(dens))] <- 0
-dens_notNA[which(is.na(sbt))] <- 0
+dens_notNA[which(is.na(sbt_rec))] <- 0
+dens_notNA[which(is.na(sbt_mort))] <- 0
 
 # assign a dummy numeric value to all NAs in dens and sbt
 dens[is.na(dens)] <- 999999
-sbt[is.na(sbt)] <- 999999
+sbt_rec[is.na(sbt_rec)] <- 999999
+sbt_mort[is.na(sbt_mort)] <- 999999
 
 O2_proj <- array(NA, dim=c(np,ny_proj))
 for(p in 1:np){
@@ -532,38 +583,78 @@ for(p in 1:np){
   }
 }
 
-sbt_proj <- array(NA, dim=c(np,ny_proj))
+strat_proj <- array(NA, dim=c(np,ny_proj))
 for(p in 1:np){
   print(p)
   for(y in 1:ny_proj){
     tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
     if(nrow(tmp6) != 0){
-    sbt_proj[p,y] <- tmp6$climvar
+      strat_proj[p,y] <- tmp6$strat
     }
   }
 }
 
-# or lagged sbt (1 yr)
-if(lagged_sbt == 1){
-  sbt_proj <- array(NA, dim=c(np,ny_proj))
+sbt_rec_proj <- array(NA, dim=c(np,ny_proj))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny_proj){
+    tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+    if(nrow(tmp6) != 0){
+    sbt_rec_proj[p,y] <- tmp6$climvar_rec
+    }
+  }
+}
+
+sbt_mort_proj <- array(NA, dim=c(np,ny_proj))
+for(p in 1:np){
+  print(p)
+  for(y in 1:ny_proj){
+    tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+    if(nrow(tmp6) != 0){
+      sbt_mort_proj[p,y] <- tmp6$climvar_mort
+    }
+  }
+}
+
+# or lagged sbt_rec (1 yr)
+if(lagged_sbt_rec == 1){
+  sbt_rec_proj <- array(NA, dim=c(np,ny_proj))
   for(p in 1:np){
     print(p)
     for(y in 1:ny_proj){
       tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
       if(nrow(tmp6) != 0){
-        sbt_proj[p,y] <- tmp6$lclimvar
+        sbt_rec_proj[p,y] <- tmp6$lclimvar_rec
       }
     }
 }
-} # close if lagged_sbt = 1
+} # close if lagged_sbt_rec = 1
+
+# or lagged sbt_mort (1 yr)
+if(lagged_sbt_mort == 1){
+  sbt_mort_proj <- array(NA, dim=c(np,ny_proj))
+  for(p in 1:np){
+    print(p)
+    for(y in 1:ny_proj){
+      tmp6 <- dat_test_dens %>% filter(patch==p, year==(y+ny)) 
+      if(nrow(tmp6) != 0){
+        sbt_mort_proj[p,y] <- tmp6$lclimvar_mort
+      }
+    }
+  }
+} # close if lagged_sbt_mort = 1
 
 O2_proj[is.na(O2_proj)] <- mean(O2_proj, na.rm = T) # temporary; no density data for these obs
-sbt_proj[is.na(sbt_proj)] <- mean(sbt_proj, na.rm = T) # temporary; no density data for these obs
-                                                      # fix if mapping projected dens is desired
+strat_proj[is.na(O2_proj)] <- mean(strat_proj, na.rm = T) # temporary; no density data for these obs
+sbt_rec_proj[is.na(sbt_rec_proj)] <- mean(sbt_rec_proj, na.rm = T) # temporary; no density data for these obs
+sbt_mort_proj[is.na(sbt_mort_proj)] <- mean(sbt_mort_proj, na.rm = T) # temporary; no density data for these obs
+# fix if mapping projected dens is desired
 
-# standardize O2 data
+# standardize O2 & stratification data
 O2S <- wiqid::standardize(O2)
-O2_projS <- wiqid::standardize(O2_proj)
+O2_projS <- wiqid::standardize2match(O2_proj, O2)
+stratS <- wiqid::standardize(strat)
+strat_projS <- wiqid::standardize2match(strat_proj, strat)
 
 f <- array(NA, dim=c(n_ages,ny))
 for(a in min_age:max_age){
@@ -579,6 +670,7 @@ for(a in min_age:max_age){
 
 # f_proj - f values for projected years
 f_proj <- array(NA, dim=c(n_ages,(ny_proj+1)))
+if(run_forecast == 1){
 for(a in min_age:max_age){
   for(y in 1:(ny_proj+1)){
     if(time_varying_f==TRUE){
@@ -588,6 +680,7 @@ for(a in min_age:max_age){
       f_proj[a,y] <-f_prep
     }
   }
+}
 }
 
 ######
@@ -605,10 +698,14 @@ stan_data <- list(
   abund_p_y_notNA = dens_notNA,
   manual_selectivity = manual_selectivity,
   selectivity_at_bin = selectivity_at_bin,
-  sbt = sbt,
-  sbt_proj=sbt_proj,
+  sbt_rec = sbt_rec,
+  sbt_rec_proj=sbt_rec_proj,
+  sbt_mort = sbt_mort,
+  sbt_mort_proj=sbt_mort_proj,
   O2 = O2S,
   O2_proj=O2_projS,
+  strat = stratS,
+  strat_projS,
   m=m,
   f=f,
   f_proj=f_proj,
@@ -630,7 +727,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221116c.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221118a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221116b.rds"))
 
 warmups <- 1000

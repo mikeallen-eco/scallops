@@ -21,6 +21,9 @@ model{
     for(t in 1:nYears) {
       y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
     }
+    
+    # log.lik[i,j]  <- logdensity.bin(y[i,j],p[i,j],1) # for lppd
+    
   }
 
   # Priors
@@ -55,5 +58,7 @@ model{
   for(t in 1:nYears) {
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
+  
+  # log.lik.cum[i] <- sum(log.lik[i,])
   
 }
