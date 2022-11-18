@@ -1,0 +1,112 @@
+# processing stratification data
+
+# load packages and data
+```{r}
+library(exactextractr)
+library(raster)
+library(sf)
+library(dplyr)
+
+# st <- 
+  # raster("D:/scallop/2022_11_big_data/fvcom_stratification_clim.tif") %>% raster::projectRaster(., crs = 4326)
+# st[st < -10] <- NA
+# st[st == 0] <- NA
+# saveRDS(st, "D:/scallop/2022_11_big_data/stratification_4326.rds")
+st <- readRDS("D:/scallop/2022_11_big_data/stratification_4326.rds")
+plot(st)
+
+# plot while omitting the very high values in Canada
+# test <- st; test[test>.1]<-NA; plot(test)
+
+# create grid cell spatial polygon using climate data file
+clim1x1 <- read.csv("processed-data/climate_formatted.csv") %>%
+    mutate(grid_lat = case_when(substr(grid_lat,4,5)=="75" ~
+                                  grid_lat-0.25,
+                                substr(grid_lat,4,5)=="25" ~
+                                  grid_lat+0.25),
+           grid_lon = case_when(substr(grid_lon,5,6)=="75" ~
+                                  grid_lon+0.25,
+                                substr(grid_lon,5,6)=="25" ~
+                                  grid_lon-0.25),
+           lat = grid_lat,
+           lon = grid_lon,
+           grid = paste0(grid_lat,grid_lon),
+           grid_num = as.numeric(as.factor(grid))) %>%
+    group_by(grid) %>%
+    summarise(across(where(is.numeric), mean)) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# create grid cell spatial polygon using climate data file
+climhalf <- read.csv("processed-data/climate_formatted.csv")%>%
+      # add grid IDs for half-degree cells
+  mutate(lon = grid_lon,
+         lat = grid_lat,
+         grid_num = as.numeric(as.factor(grid))) %>%
+    select(grid, grid_num, grid_lon, grid_lat, lon, lat) %>%
+    distinct() %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+clim1x1.r = rasterFromXYZ(xyz = cbind(clim1x1$lon, clim1x1$lat, 
+                          clim1x1$grid_num), crs = 4326)
+
+climhalf.r = rasterFromXYZ(xyz = cbind(climhalf$lon, climhalf$lat, 
+                          climhalf$grid_num), crs = 4326)
+
+plot(clim1x1.r)
+plot(climhalf.r)
+
+clim1x1.p = rasterToPolygons(clim1x1.r) %>%
+  st_as_sf()
+
+climhalf.p = rasterToPolygons(climhalf.r) %>%
+  st_as_sf()
+
+plot(clim1x1.p)
+plot(climhalf.p)
+
+means1x1 = exactextractr::exact_extract(x = st, y = clim1x1.p, 
+                                    fun = "mean")
+
+meanshalf = exactextractr::exact_extract(x = st, y = climhalf.p, 
+                                    fun = "mean")
+
+clim1x1.p2 = clim1x1.p %>%
+  mutate(strat = means1x1) %>%
+  rename(grid_num = layer)
+
+climhalf.p2 = climhalf.p %>%
+  mutate(strat = meanshalf) %>%
+  rename(grid_num = layer)
+
+plot(clim1x1.p2[,"strat"])
+plot(climhalf.p2[,"strat"])
+
+# create final mean strafication by grid cell file
+strat1x1 <- clim1x1 %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  left_join(as.data.frame(st_drop_geometry(clim1x1.p2)), 
+            by = "grid_num") %>%
+  select(grid, grid_lon = lon, grid_lat = lat, strat)
+
+strathalf <- climhalf %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  left_join(as.data.frame(st_drop_geometry(climhalf.p2)), 
+            by = "grid_num") %>%
+  select(grid, grid_lon = lon, grid_lat = lat, strat)
+
+saveRDS(strat1x1, "processed-data/strat1x1.rds")
+saveRDS(strathalf, "processed-data/strathalf.rds")
+
+```
+# extract stratification by gridcell
+```{r}
+st_crs(st)
+
+
+
+```
+
