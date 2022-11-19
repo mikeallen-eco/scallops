@@ -20,9 +20,9 @@ model{
     # detection process
     for(t in 1:nYears) {
       y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
     }
     
-    # log.lik[i,j]  <- logdensity.bin(y[i,j],p[i,j],1) # for lppd
     
   }
 

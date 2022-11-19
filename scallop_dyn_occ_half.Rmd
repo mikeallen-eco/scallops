@@ -434,9 +434,9 @@ model{
     # detection process
     for(t in 1:nYears) {
       y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
     }
     
-    # log.lik[i,j]  <- logdensity.bin(y[i,j],p[i,j],1) # for lppd
     
   }
 
@@ -534,8 +534,10 @@ wanted <- c("Topt1", "width1",
 ( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
     jagsUI::jags(jdata, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+# original runs were 10000 iter + 1000 adapt (300 MB file)
+# looic runs are 1
 
 saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
         "output/psi.meansbt.o2.strat.phi.maxsbt.o2.strat.gam.minsbt.o2.strat.rds")
@@ -544,8 +546,8 @@ saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
 ( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
     jagsUI::jags(jdataL0L1, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2,
         "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL1.o2.strat.rds")
@@ -554,8 +556,8 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2,
 ( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2 <- 
     jagsUI::jags(jdataL0L2, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
         "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL2.o2.strat.rds")
@@ -564,8 +566,8 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
 ( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2 <- 
     jagsUI::jags(jdataL0L3, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
         "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL3.o2.strat.rds")
@@ -625,8 +627,8 @@ wanted <- c("Topt1", "width1",
 ( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
     jagsUI::jags(jdata_L0mean, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.strat.gam.meansbt.o2.strat.rds")
@@ -635,8 +637,8 @@ saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
 ( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
     jagsUI::jags(jdataL0L1a, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL1.o2.strat.rds")
@@ -645,8 +647,8 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
 ( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
     jagsUI::jags(jdataL0L2a, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL2.o2.strat.rds")
@@ -655,8 +657,8 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
 ( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
     jagsUI::jags(jdataL0L3a, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL3.o2.strat.rds")
