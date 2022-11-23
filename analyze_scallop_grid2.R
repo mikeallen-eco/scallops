@@ -26,7 +26,7 @@ sapply(funs, function(x) source(file.path("functions",x)))
 rstan_options(javascript=FALSE, auto_write =TRUE)
 
 # set the 
-# plotsave <- "results/run20221116c"
+# plotsave <- "results/run20221122a"
 
 # read in stratification data
 strat1x1 <- readRDS("processed-data/strat1x1.rds")
@@ -755,14 +755,14 @@ stan_data <- list(
 saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221118a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221118a.rds"))
 
-warmups <- 1000
-total_iterations <- 2000
+warmups <- 1000 # was 1000 during testing
+total_iterations <- 2000 # was warmup + 1000 during testing
 max_treedepth <-  10
 n_chains <- 3
 n_cores <- 3
 n_thin <- 3
 np <- stan_data$np
-init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T))
+init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T)) # group_by patch for original formulation
 init_rec <- log(1e-02 + init_rec1$mean_dens*1000)
 lmr_tmp <- log(c(2186.86, 9.619022e+01, 10266.576,   8647.892, 107679.41,  
                   6283.6557, 184734.28,  39878.84, 3.586360e+01, 561835.3,  55152.42, 
@@ -771,6 +771,7 @@ lmr_tmp <- log(c(2186.86, 9.619022e+01, 10266.576,   8647.892, 107679.41,
                   7966.442, 10022.101,  9412.635,  377.90775, 1747.2184, 14141.341,
                   7697.897,  695.8220,  8918.266, 14240.83, 15466.216, 4282.202, 9164.165))
 lmr_tmp <- init_rec # if not using the normal 37 patches
+lmr_tmp <- log(1000)
 raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825, 
              -0.69553989327405, 0.00387385992451144, -0.175824074445246, 0.160430833669419, 
              0.422539284632822, -0.166649485677969, 0.863899307619138, 0.042304469919741, 
@@ -778,9 +779,9 @@ raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825,
              -0.32918472679931, -0.360798806715211, -0.547949986471929, 0.466673285376792, 
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)#[2:25]
-raw_tmp <- rep(0.1, np) # if not using the normal 37 patches
+raw_tmp <- rep(0.1, ny) # if not using the normal 25 year train period (1980-2004)
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2strat.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1meanrec_O2stratrec_O2mort.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -825,8 +826,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_O2
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221118a.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221116c.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221122b.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221122a.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -837,31 +838,13 @@ sum(sp[[3]][,"divergent__"])
 rm(sp)
 
 # pairs
-pairs(stan_model_fit,
-      pars = c("Topt", "width", "beta_obs", "sigma_r", "sigma_obs"))
+# pairs(stan_model_fit,
+#       pars = c("Topt", "width", "beta_obs", "sigma_r", "sigma_obs"))
 
-# look at summaries of parameters
-s_Topt <- summary(stan_model_fit, pars = c("Topt", "width"))
-s_Topt$summary
-rm(s_Topt)
-
-# estimated density of >80mm scallops
-s_dens80 <- summary(stan_model_fit, pars = c("dens_p_y_hat80"))
-s_dens80$summary
-summary(s_dens80$summary[,"Rhat"])
-
-# projected density of >80mm scallops
-s_proj_dens80 <- summary(stan_model_fit, pars = c("dens_p_y_hat80"))
-s_proj_dens80$summary
-summary(s_proj_dens80$summary[,"Rhat"])
-
-bayesplot::mcmc_pairs(stan_model_fit)
+# bayesplot::mcmc_pairs(stan_model_fit)
 
 # library(shinystan)
-launch_shinystan(stan_model_fit)
-
-# examine rhats
-summary(stan_model_fit)$summary$Rhat
+# launch_shinystan(stan_model_fit)
 
 post <- list(
 T_adjust_rec = rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec,
@@ -870,10 +853,12 @@ T_adjust_mort = rstan::extract(stan_model_fit, "T_adjust_mort")$T_adjust_mort,
 T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adjust_mort_proj,
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
-O2beta0rec = rstan::extract(stan_model_fit, "O2beta0rec")$O2beta0rec,
+linbeta0rec = rstan::extract(stan_model_fit, "linbeta0rec")$linbeta0rec,
 O2betarec = rstan::extract(stan_model_fit, "O2betarec")$O2betarec,
-O2beta0mort = rstan::extract(stan_model_fit, "O2beta0mort")$O2beta0mort,
+stratbetarec = rstan::extract(stan_model_fit, "stratbetarec")$stratbetarec,
+linbeta0mort = rstan::extract(stan_model_fit, "linbeta0mort")$linbeta0mort,
 O2betamort = rstan::extract(stan_model_fit, "O2betamort")$O2betamort,
+stratbetamort = rstan::extract(stan_model_fit, "stratbetamort")$stratbetamort,
 Topt_rec = rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec,
 width_rec = rstan::extract(stan_model_fit, "width_rec")$width_rec,
 Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
@@ -883,19 +868,22 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221116c.rds")
+saveRDS(post, "results/stan_model_posts_run20221118a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width_rec")$width_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "width_mort")$width_mort, c(0.025, 0.5, 0.975))
-quantile(rstan::extract(stan_model_fit, "O2beta0rec")$O2beta0rec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "linbeta0rec")$linbeta0rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "O2betarec")$O2betarec, c(0.025, 0.5, 0.975))
-quantile(rstan::extract(stan_model_fit, "O2beta0mort")$O2beta0mort, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "stratbetarec")$stratbetarec, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "linbeta0mort")$linbeta0mort, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "O2betamort")$O2betamort, c(0.025, 0.5, 0.975))
+quantile(rstan::extract(stan_model_fit, "stratbetamort")$stratbetamort, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta")$Tbeta, c(0.025, 0.5, 0.975))
 apply(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))
+quantile(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "sigma_r")$sigma_r, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "sigma_obs")$sigma_obs, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "beta_obs")$beta_obs, c(0.025, 0.5, 0.975))
@@ -904,7 +892,7 @@ quantile(rstan::extract(stan_model_fit, "p_length_50_sel")$p_length_50_sel, c(0.
 apply(rstan::extract(stan_model_fit, "raw")$raw, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))[2,]
 
 # examine T_adjust (modeled and projected)
-test=apply(rstan::extract(stan_model_fit, "T_adjust")$T_adjust, c(2,3), median)
+test=apply(rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec, c(2,3), median)
 plot(test[1,], ylim = c(0,1), type = "l")
 for(i in 1:np){
   points(test[i,], ylim = c(0,1), type = "l")
@@ -983,10 +971,13 @@ ggsave(here(plotsave, "AAA_plot_Topt&width_curve_mort.png"),
 rm(topt_mort_plot, topt_mort_plot2, topt_mort_plot3_CI)
 
 # plot important parameters 
-plot(stan_model_fit, pars=c('sigma_r','sigma_obs','d','width','Topt','alpha','beta_obs','theta_d'))
+plot(stan_model_fit, pars=c('width_rec', 'width_mort','Topt_rec','Topt_mort'))
 ggsave(here(plotsave, "A_plot_important_parameters1.png"))
+plot(stan_model_fit, pars=c('O2betarec','stratbetarec','O2betamort','stratbetamort'))
+ggsave(here(plotsave, "A2_plot_important_parameters1.png"))
 plot(stan_model_fit, pars=c('sigma_r','sigma_obs','d','alpha','beta_obs','theta_d'))
 ggsave(here(plotsave, "B_plot_important_parameters2.png"))
+
 
 # assess abundance fits
 
@@ -1055,7 +1046,7 @@ for( i in 1:np ) {
     scale_y_log10()
   abundance_v_time80
   
-  ggsave(plot = abundance_v_time, filename=here(plotsave,
+  ggsave(plot = abundance_v_time80, filename=here(plotsave,
                                                 paste0("F_log_density80_v_time_no_length_comps_patch_",
                                                        as.character(i), ".png")), width=5, height=5, dpi = 200)
 }
@@ -1634,7 +1625,17 @@ est_patch_abund80 <- abund_p_y_hat80 %>%
   group_by(year, patch) %>% 
   summarise(abundance = mean(dens_p_y_hat80))
 
-observed_abundance_tile <- abund_p_y %>% 
+(observed_abundance_tile <- abund_p_y %>% 
+  filter(abundance < 20000000) %>%
+  ggplot(aes(x=year, y=patch, fill=abundance)) +
+  geom_tile() +
+  theme_bw() +
+  scale_x_continuous(breaks=seq(0, 36, 4)) +
+  scale_y_continuous(breaks=seq(0, 36, 4)) +
+  labs(title="Observed", x="Year", y="Patch", fill="Abundance") +
+  viridis::scale_fill_viridis())
+
+(observed_abundance_tile80 <- abund_p_y80 %>% 
   # filter(abundance < 20000000) %>%
   ggplot(aes(x=year, y=patch, fill=abundance)) +
   geom_tile() +
@@ -1642,35 +1643,25 @@ observed_abundance_tile <- abund_p_y %>%
   scale_x_continuous(breaks=seq(0, 36, 4)) +
   scale_y_continuous(breaks=seq(0, 36, 4)) +
   labs(title="Observed", x="Year", y="Patch", fill="Abundance") +
-  viridis::scale_fill_viridis()
+  viridis::scale_fill_viridis())
 
-observed_abundance_tile80 <- abund_p_y80 %>% 
-  # filter(abundance < 20000000) %>%
-  ggplot(aes(x=year, y=patch, fill=abundance)) +
-  geom_tile() +
-  theme_bw() +
-  scale_x_continuous(breaks=seq(0, 36, 4)) +
-  scale_y_continuous(breaks=seq(0, 36, 4)) +
-  labs(title="Observed", x="Year", y="Patch", fill="Abundance") +
-  viridis::scale_fill_viridis()
-
-estimated_abundance_tile <- est_patch_abund %>% 
+(estimated_abundance_tile <- est_patch_abund %>% 
   ggplot(aes(x=year, y=patch, fill=abundance)) +
   geom_tile() +
   theme_bw() +
   scale_x_continuous(breaks=seq(0, 36, 4)) +
   scale_y_continuous(breaks=seq(0, 36, 4)) +
   labs(title="Estimated", x="Year", y="Patch", fill="Abundance") +
-  viridis::scale_fill_viridis()
+  viridis::scale_fill_viridis())
 
-estimated_abundance_tile80 <- est_patch_abund80 %>% 
+(estimated_abundance_tile80 <- est_patch_abund80 %>% 
   ggplot(aes(x=year, y=patch, fill=abundance)) +
   geom_tile() +
   theme_bw() +
   scale_x_continuous(breaks=seq(0, 36, 4)) +
   scale_y_continuous(breaks=seq(0, 36, 4)) +
   labs(title="Estimated", x="Year", y="Patch", fill="Abundance") +
-  viridis::scale_fill_viridis()
+  viridis::scale_fill_viridis())
 
 ggsave(observed_abundance_tile, filename=here(plotsave,"U_abundance_v_time_observed_tileplot_no_length_comps2.png"))
 ggsave(estimated_abundance_tile, filename=here(plotsave,"V_abundance_v_time_estimated_tileplot_no_length_comps.png"))
@@ -1678,17 +1669,28 @@ ggsave(observed_abundance_tile80, filename=here(plotsave,"U_abundance80_v_time_o
 ggsave(estimated_abundance_tile80, filename=here(plotsave,"V_abundance80_v_time_estimated_tileplot_no_length_comps.png"))
 
 # plot temperature difference from optimum over space and time
-Topt <- extract(stan_model_fit, "Topt")$Topt
-hist(Topt) # note, not normally distributed
+Topt_rec <- extract(stan_model_fit, "Topt_rec")$Topt_rec
+hist(Topt_rec) 
+Topt_mort <- extract(stan_model_fit, "Topt_mort")$Topt_mort
+hist(Topt_mort)
 
 dat_train_sbt <- dat_train_dens # SCALLOP: because I didn't define a stand-alone sbt data frame
 dat_train_sbt %>%
-  mutate(Tdiff = mean_sbt - median(Topt)) %>%
+  mutate(Tdiff = climvar_rec - median(Topt_rec)) %>%
   ggplot(aes(x=year, y=patch, fill=Tdiff)) +
   geom_tile() + 
   scale_fill_gradient2(low="blue", high="red", mid="white", midpoint=0)
 
-ggsave(here(plotsave, "W_Tdiff_by_patch_yearB.png"))
+ggsave(here(plotsave, "W_Tdiff_by_patch_yearB_rec.png"))
+
+dat_train_sbt <- dat_train_dens # SCALLOP: because I didn't define a stand-alone sbt data frame
+dat_train_sbt %>%
+  mutate(Tdiff = climvar_mort - median(Topt_mort)) %>%
+  ggplot(aes(x=year, y=patch, fill=Tdiff)) +
+  geom_tile() + 
+  scale_fill_gradient2(low="blue", high="red", mid="white", midpoint=0)
+
+ggsave(here(plotsave, "W_Tdiff_by_patch_yearB_mort.png"))
 
 
 
