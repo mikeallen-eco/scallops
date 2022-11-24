@@ -182,7 +182,7 @@ parameters{
   
   real linbeta0rec; // intercept for logistic function vs. recruitment
   
-  real O2betarec; // slope for O2 in logistic function vs. recruitment
+  // real O2betarec; // slope for O2 in logistic function vs. recruitment
   
   real stratbetarec; // slope for stratification in logistic function vs. recruitment
 
@@ -190,7 +190,7 @@ parameters{
   
   real O2betamort; // slope for O2 in logistic function vs. survival
   
-  real stratbetamort; // slope for stratification in logistic function vs. survival
+  // real stratbetamort; // slope for stratification in logistic function vs. survival
   
   // real<lower = -1, upper = 1> alpha; // autocorrelation term
   
@@ -309,7 +309,7 @@ if(T_dep_recruitment == 1){
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
     for(y in 1:ny_train){
-      T_adjust_rec[p,y] = T_dep_rec(sbt_rec[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + O2betarec*O2[p,y] + stratbetarec*strat[p,y]);  
+      T_adjust_rec[p,y] = T_dep_rec(sbt_rec[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + stratbetarec*strat[p,y]);  
       // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
 
     } // close years
@@ -512,7 +512,7 @@ model {
     sigma_r ~ normal(.7,.2); 
     
     // for(i in 1:np){
-    log_mean_recruits ~ normal(10,5); // was norm(7,3) or norm(7,5)
+    log_mean_recruits ~ normal(7,5); // was (7,5)
     // }
   }
   
@@ -531,7 +531,7 @@ model {
   
   linbeta0rec ~ normal(0, 1.4);
 
-  O2betarec ~ normal(0, 5);
+  // O2betarec ~ normal(0, 5);
   
   stratbetarec ~ normal(0, 5);
 
@@ -539,7 +539,7 @@ model {
 
   O2betamort ~ normal(0, 5);
 
-  stratbetamort ~ normal(0, 5);
+  // stratbetamort ~ normal(0, 5);
   
   // log_sigma_r ~ normal(log(.5),.1); // process error prior
   
@@ -636,13 +636,13 @@ generated quantities {
   if(run_forecast==1){
   for(p in 1:np){
     for(y in 1:ny_proj){
-      T_adjust_rec_proj[p,y] = T_dep_rec(sbt_rec_proj[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + O2betarec*O2[p,y] + stratbetarec*strat[p,y]);
+      T_adjust_rec_proj[p,y] = T_dep_rec(sbt_rec_proj[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + stratbetarec*strat_proj[p,y]);
     } // close years
   } // close patches
   
   for(p in 1:np){
     for(y in 1:ny_proj){
-      T_adjust_mort_proj[p,y] = T_dep_mort(sbt_mort_proj[p,y], Topt_mort, width_mort) * inv_logit(linbeta0mort + O2betamort*O2[p,y]);
+      T_adjust_mort_proj[p,y] = T_dep_mort(sbt_mort_proj[p,y], Topt_mort, width_mort) * inv_logit(linbeta0mort + O2betamort*O2_proj[p,y]);
     } // close years
   } // close patches
 

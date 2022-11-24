@@ -771,17 +771,27 @@ lmr_tmp <- log(c(2186.86, 9.619022e+01, 10266.576,   8647.892, 107679.41,
                   7966.442, 10022.101,  9412.635,  377.90775, 1747.2184, 14141.341,
                   7697.897,  695.8220,  8918.266, 14240.83, 15466.216, 4282.202, 9164.165))
 lmr_tmp <- init_rec # if not using the normal 37 patches
-lmr_tmp <- log(1000)
-raw_tmp <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825, 
+lmr_tmp <- 7
+raw_25 <- c(0.0153616583453765, -0.127174288768915, -0.644971996436825, 
              -0.69553989327405, 0.00387385992451144, -0.175824074445246, 0.160430833669419, 
              0.422539284632822, -0.166649485677969, 0.863899307619138, 0.042304469919741, 
              0.421033238400987, 0.602614757775617, 0.0587202896797734, 0.360573368807022, 
              -0.32918472679931, -0.360798806715211, -0.547949986471929, 0.466673285376792, 
              1.21408911211683, 0.878696514968935, 0.562536621090476, -0.200755914900746, 
              -0.571006916717912, 0.241794514756976)#[2:25]
+raw_32 <- c(-0.424310247742902, -0.414155817561512, -0.719448908084408, 
+  -0.300974391262478, 0.169807792102012, 0.25153529925493, 0.51527426755199, 
+  -0.0328727853644744, 0.504098476244701, -0.138741294185967, -0.461813618013532, 
+  -0.14776194729758, 0.232736930827345, -0.181912544613632, -0.740353694682249, 
+  -0.343753935190534, 1.02404358450721, 0.38774913664048, 1.01534545951265, 
+  -0.202645468248978, -0.575970421374632, 0.222679699956965, 0.382858598288702, 
+  -0.157383214896482, 0.00204797991102328, 0.838577648284484, 0.604987100928047, 
+  0.636711938280816, 0.545078343172636, 0.534133399722859, 1.65498590549278, 
+  1.86441239407225)
 raw_tmp <- rep(0.1, ny) # if not using the normal 25 year train period (1980-2004)
+raw_tmp <- raw_32
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1meanrec_O2stratrec_O2mort.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1meanrec_stratrec_O2mort.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
@@ -826,8 +836,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221122b.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221122a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221123a.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221122b.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -854,11 +864,11 @@ T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adju
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
 linbeta0rec = rstan::extract(stan_model_fit, "linbeta0rec")$linbeta0rec,
-O2betarec = rstan::extract(stan_model_fit, "O2betarec")$O2betarec,
+# O2betarec = rstan::extract(stan_model_fit, "O2betarec")$O2betarec,
 stratbetarec = rstan::extract(stan_model_fit, "stratbetarec")$stratbetarec,
 linbeta0mort = rstan::extract(stan_model_fit, "linbeta0mort")$linbeta0mort,
 O2betamort = rstan::extract(stan_model_fit, "O2betamort")$O2betamort,
-stratbetamort = rstan::extract(stan_model_fit, "stratbetamort")$stratbetamort,
+# stratbetamort = rstan::extract(stan_model_fit, "stratbetamort")$stratbetamort,
 Topt_rec = rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec,
 width_rec = rstan::extract(stan_model_fit, "width_rec")$width_rec,
 Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
@@ -868,7 +878,7 @@ proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221118a.rds")
+saveRDS(post, "results/stan_model_posts_run20221123a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
@@ -884,6 +894,7 @@ quantile(rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Tbeta")$Tbeta, c(0.025, 0.5, 0.975))
 apply(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, 2, function(x) quantile(x, c(0.025, 0.5, 0.975)))
 quantile(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits, c(0.025, 0.5, 0.975))
+plot(log(rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits), type = "l")
 quantile(rstan::extract(stan_model_fit, "sigma_r")$sigma_r, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "sigma_obs")$sigma_obs, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "beta_obs")$beta_obs, c(0.025, 0.5, 0.975))
@@ -893,6 +904,11 @@ apply(rstan::extract(stan_model_fit, "raw")$raw, 2, function(x) quantile(x, c(0.
 
 # examine T_adjust (modeled and projected)
 test=apply(rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec, c(2,3), median)
+plot(test[1,], ylim = c(0,1), type = "l")
+for(i in 1:np){
+  points(test[i,], ylim = c(0,1), type = "l")
+}
+test=apply(rstan::extract(stan_model_fit, "T_adjust_mort")$T_adjust_mort, c(2,3), median)
 plot(test[1,], ylim = c(0,1), type = "l")
 for(i in 1:np){
   points(test[i,], ylim = c(0,1), type = "l")
