@@ -478,6 +478,75 @@ model{
 }
 ")
 ```
+# Define the model (psi.sbt.o2.strat, phi.sbt.o2, gam.sbt.strat)
+```{r}
+
+cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt", 
+    "
+model{
+  for(i in 1:nSites) {
+    # biological process
+    lpsi1[i] <- lpsiInt + betapsiO2*O2a[i,1] + betapsistrat*strat[i,1]
+    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
+    z[i, 1] ~ dbern(psi1[i])
+    for(t in 2:nYears) {
+      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2b[i,t-1]
+      phi[i, t-1] <-
+        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
+      lgam[i, t-1] <- lgamInt[t-1] + 
+                        betagamstrat*strat[i,t-1]
+      gamma[i, t-1] <- 
+        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
+      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
+          (1 - z[i, t-1])*gamma[i, t-1])
+   }
+    # detection process
+    for(t in 1:nYears) {
+      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
+    }
+    
+    
+  }
+
+  # Priors
+  psiInt ~ dbeta(1, 1)
+  lpsiInt <- logit(psiInt)
+
+  for(t in 1:(nYears-1)) {
+    phiInt[t] ~ dbeta(1, 1)
+    lphiInt[t] <- logit(phiInt[t])
+    gamInt[t] ~ dbeta(1, 1)
+    lgamInt[t] <- logit(gamInt[t])
+  }
+
+  for(t in 1:nYears) {
+    p[t] ~ dbeta(1, 1)
+  }
+
+  Topt1 ~ dnorm(8,16)
+  width1 ~ dnorm(5,10)
+  Topt2 ~ dnorm(8,16)
+  width2 ~ dnorm(5,10)
+  Topt3 ~ dnorm(8,16)
+  width3 ~ dnorm(5,10)
+  betapsiO2 ~ dnorm(0,5)
+  betaphiO2 ~ dnorm(0,5)
+  # betagamO2 ~ dnorm(0,5)
+  betapsistrat ~ dnorm(0,5)
+  # betaphistrat ~ dnorm(0,5)
+  betagamstrat ~ dnorm(0,5)
+
+  # Derived variable
+  for(t in 1:nYears) {
+    N[t] <- sum(z[,t]) # no. sites occupied for each year
+  }
+  
+  # log.lik.cum[i] <- sum(log.lik[i,])
+  
+}
+")
+```
 # Bundle data for JAGS & run models
 # Mean, Max, Min SBT hypothesis
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
@@ -570,7 +639,7 @@ saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
-        "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL3.o2.strat.rds")
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL3.o2.strat.rds")
 ```
 # Bundle data for JAGS & run models (mean SBT only)
 # Mean, mean, mean SBT hypothesis
@@ -607,7 +676,7 @@ jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
     O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
     strat = strat_matS)
-str(jdataL0L2)
+str(jdataL0L2a)
 
 jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
@@ -663,6 +732,66 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL3.o2.strat.rds")
 ```
+# SMALLER MODELS W/ JUST 1 LINEAR COVARIATE EACH
+# Bundle data for JAGS & run models (mean SBT only)
+# Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
+
+jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0mean)
+
+jdata_L0meanmax <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = maxsbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0meanmax)
+
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", 
+            "betapsistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "psiInt", "phiInt", "gamInt", "p")
+
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat <- 
+    jagsUI::jags(jdata_L0mean, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+# psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat
+( psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat <- 
+    jagsUI::jags(jdata_L0meanmax, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat.rds")
+```
+
 # Bonanza model (90th percentile hauls): 
 # Bundle data for JAGS & run models (mean SBT only)
 # Mean, mean, mean SBT hypothesis
@@ -913,6 +1042,7 @@ psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betagamO2
 
 ```
 # Map mean colonization - extinction by patch
+Model: psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
 ```{r}
 psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
   readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
@@ -984,6 +1114,156 @@ colext %>%
           title = element_text(size = 12, hjust = 0.5))
 
 ggsave("figures/dynocc/scallop_dynocc_predicted_colext.png",
+        height = 5, width = 5, dpi = 400)
+```
+# Map mean colonization - extinction by patch
+Model: psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+```{r}
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+# get posteriors for colonization (by cell and year)
+col.p <- 
+  mod$sims.list$gamma
+
+# get posteriors for extinction (by cell and year)
+ext.p <-
+  1-mod$sims.list$phi
+
+# get posteriors for col - ext (by cell and year)
+colext.p <- col.p - ext.p
+
+# to check that apply worked right
+# colext.m <- mod$mean$gamma - (1-mod$mean$phi)
+
+# get mean & q2.5 of posterior for col - ext by cell and year
+# colext.mean.by.year = apply(colext.p, c(2,3), mean)
+# colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
+colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+colext.q95.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.95))
+
+# put mean col-ext by cell (across years) into a dataframe for mapping
+colext <- ymat_gridnames %>%
+  mutate(colext.mean = colext.mean.all.years,
+         colext.q5 = colext.q5.all.years,
+         colext.q95 = colext.q95.all.years,
+         grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext)
+
+# map modeled mean col-ext for 1983-2014
+colext %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = colext.mean),
+              color = "black") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q5>0),
+               shape = "+") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q95<0),
+               shape = "-") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean colonization - extinction\n(1983-2014)") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/dynocc/scallop_dynocc_predicted_colext_rmeanstrat_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+```
+# Map mean colonization - extinction by patch
+Model: psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbt.o2.strat
+```{r}
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.strat.gam.meansbt.o2.strat.rds")
+
+# get posteriors for colonization (by cell and year)
+col.p <- 
+  mod$sims.list$gamma
+
+# get posteriors for extinction (by cell and year)
+ext.p <-
+  1-mod$sims.list$phi
+
+# get posteriors for col - ext (by cell and year)
+colext.p <- col.p - ext.p
+
+# to check that apply worked right
+# colext.m <- mod$mean$gamma - (1-mod$mean$phi)
+
+# get mean & q2.5 of posterior for col - ext by cell and year
+# colext.mean.by.year = apply(colext.p, c(2,3), mean)
+# colext.q2.5.by.year = apply(colext.p, c(2,3), function(x)quantile(x, 0.025))
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
+colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+colext.q95.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.95))
+
+# put mean col-ext by cell (across years) into a dataframe for mapping
+colext <- ymat_gridnames %>%
+  mutate(colext.mean = colext.mean.all.years,
+         colext.q5 = colext.q5.all.years,
+         colext.q95 = colext.q95.all.years,
+         grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext)
+
+# map modeled mean col-ext for 1983-2014
+colext %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = colext.mean),
+              color = "black") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q5>0),
+               shape = "+") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q95<0),
+               shape = "-") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean colonization - extinction\n(1983-2014)") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/dynocc/scallop_dynocc_predicted_colext_rmeanO2strat_mmeanO2strat.png",
         height = 5, width = 5, dpi = 400)
 ```
 # Bonanza (top 90% or 95%) model: Map mean colonization - extinction by patch
