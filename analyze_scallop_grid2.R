@@ -15,11 +15,8 @@ library(here)
 library(magrittr)
 library(rstan)
 library(Matrix)
-# library(ggridges)
 # library(rstanarm)
 library(geosphere)
-# library(ggridges)
-# library(Amelia) # seems to interfere with Stan
 funs <- list.files("functions")
 sapply(funs, function(x) source(file.path("functions",x)))
 
@@ -46,7 +43,7 @@ clim_avg <- clim %>%
 train_years <- 1983:2014 # set training year range
 test_years <- 2013:2014 # set testing year range
 season <- "both" # "spring", "fall", or "both
-grid_1x1 <- 1 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
+grid_1x1 <- 0 # 1 = 1x1 degree grid, 0 = 0.5 x 0.5 degree grid
 max_NA_dens <- 4 # set max number of NA dens values for each cell
 # max_NA_sbt <- 4 # set max number of NA sbt values for each cell
 lagged_sbt_rec <- 0 # 1 = sbt lagged 1 year; 0 = not
@@ -752,15 +749,15 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221118a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221118a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221124a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221124a.rds"))
 
-warmups <- 1000 # was 1000 during testing
-total_iterations <- 2000 # was warmup + 1000 during testing
+warmups <- 2000 # was 1000 during testing
+total_iterations <- 3000 # was warmup + 1000 during testing
 max_treedepth <-  10
 n_chains <- 3
 n_cores <- 3
-n_thin <- 3
+n_thin <- 12 # try 12 if keeping 1000
 np <- stan_data$np
 init_rec1 <- dat_train_dens %>% group_by(patch) %>% summarize(mean_dens = mean(mean_dens, na.rm = T)) # group_by patch for original formulation
 init_rec <- log(1e-02 + init_rec1$mean_dens*1000)
@@ -791,14 +788,20 @@ raw_32 <- c(-0.424310247742902, -0.414155817561512, -0.719448908084408,
 raw_tmp <- rep(0.1, ny) # if not using the normal 25 year train period (1980-2004)
 raw_tmp <- raw_32
 
-stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1meanrec_stratrec_O2mort.stan"),
+stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1meanrec_O2stratrec_O2stratmort.stan"),
                        data = stan_data,
                        chains = n_chains,
                        warmup = warmups,
                        thin = n_thin,
                        init = list(list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                   Topt = 9,
-                                   width = 3,
+                                   Topt_rec = 8,
+                                   width_rec = 4,
+                                   Topt_mort = 8,
+                                   width_mort = 4,
+                                   O2betarec = 0.5,
+                                   O2betamort = 0.5,
+                                   stratbetamort = 0.5,
+                                   stratbetarec = 0.5,
                                    sigma_obs = 1.58,
                                    sigma_r = 0.70,
                                    beta_obs = 1.126561e-04,
@@ -807,8 +810,14 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                    raw = raw_tmp,
                                    ssb0=1000000),
                                    list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                        Topt = 9,
-                                        width = 3,
+                                   Topt_rec = 8,
+                                   width_rec = 4,
+                                   Topt_mort = 8,
+                                   width_mort = 4,
+                                   O2betarec = 0.5,
+                                   O2betamort = 0.5,
+                                   stratbetamort = 0.5,
+                                   stratbetarec = 0.5,
                                         sigma_obs = 1.58,
                                         sigma_r = 0.70,
                                         beta_obs = 1.126561e-04,
@@ -817,8 +826,14 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                         raw = raw_tmp,
                                         ssb0=1000000),
                                    list(log_mean_recruits = lmr_tmp, #init_rec, #rep(log(1000),np), #                                         theta_d = 1,
-                                        Topt = 9,
-                                        width = 3,
+                                        Topt_rec = 8,
+                                        width_rec = 4,
+                                        Topt_mort = 8,
+                                        width_mort = 4,
+                                        O2betarec = 0.5,
+                                        O2betamort = 0.5,
+                                        stratbetamort = 0.5,
+                                        stratbetarec = 0.5,
                                         sigma_obs = 1.58,
                                         sigma_r = 0.70,
                                         beta_obs = 1.126561e-04,
@@ -830,13 +845,18 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                        iter = total_iterations,
                        cores = n_cores,
                        refresh = 100,
+                       pars = c("Topt_rec", "width_rec", "Topt_mort", "width_mort",
+                                "linbeta0rec", "O2betarec", "stratbetarec", 
+                                "linbeta0mort", "O2betamort", "stratbetamort", 
+                                "mean_recruits", "surv", "beta_obs", "sigma_r",
+                                "raw", "rec_dev"),
                        save_warmup = F,
-                       # save_dso = F,
+                       save_dso = F,
                        control = list(max_treedepth = max_treedepth,
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221123a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221124a.rds"))
 # stan_model_fit <- readRDS(here("results","stan_model_fit_run20221122b.rds"))
 
 # assess how many divergent transitions in each chain
@@ -857,10 +877,10 @@ rm(sp)
 # launch_shinystan(stan_model_fit)
 
 post <- list(
-T_adjust_rec = rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec,
-T_adjust_rec_proj = rstan::extract(stan_model_fit, "T_adjust_rec_proj")$T_adjust_rec_proj,
-T_adjust_mort = rstan::extract(stan_model_fit, "T_adjust_mort")$T_adjust_mort,
-T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adjust_mort_proj,
+# T_adjust_rec = rstan::extract(stan_model_fit, "T_adjust_rec")$T_adjust_rec,
+# T_adjust_rec_proj = rstan::extract(stan_model_fit, "T_adjust_rec_proj")$T_adjust_rec_proj,
+# T_adjust_mort = rstan::extract(stan_model_fit, "T_adjust_mort")$T_adjust_mort,
+# T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adjust_mort_proj,
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
 linbeta0rec = rstan::extract(stan_model_fit, "linbeta0rec")$linbeta0rec,
@@ -872,13 +892,13 @@ O2betamort = rstan::extract(stan_model_fit, "O2betamort")$O2betamort,
 Topt_rec = rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec,
 width_rec = rstan::extract(stan_model_fit, "width_rec")$width_rec,
 Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
-width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort,
-dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
-proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
+width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort#,
+# dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
+# proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221123a.rds")
+saveRDS(post, "results/stan_model_posts_run20221124a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
