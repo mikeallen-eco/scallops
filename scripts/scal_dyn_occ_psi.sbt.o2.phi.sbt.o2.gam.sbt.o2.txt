@@ -9,7 +9,8 @@ model{
       lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2b[i,t-1]
       phi[i, t-1] <-
         ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2c[i,t-1]
+      lgam[i, t-1] <- lgamInt[t-1] + 
+                        betagamO2*O2c[i,t-1]
       gamma[i, t-1] <- 
         ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
       z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
@@ -18,7 +19,10 @@ model{
     # detection process
     for(t in 1:nYears) {
       y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
+    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
     }
+    
+    
   }
 
   # Priors
@@ -50,5 +54,7 @@ model{
   for(t in 1:nYears) {
     N[t] <- sum(z[,t]) # no. sites occupied for each year
   }
+  
+  # log.lik.cum[i] <- sum(log.lik[i,])
   
 }

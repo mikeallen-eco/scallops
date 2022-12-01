@@ -7,14 +7,39 @@ library(tidyr)
 library(ggplot2)
 library(sf)
 
-rmeanO2 <- readRDS("results/stan_model_posts_run20221116a.rds")
-mmeanO2 <- readRDS("results/stan_model_posts_run20221116b.rds")
-# rec - meanSBT, strat; mort - meanSBT, O2
-rm1 <- rmeanstrat_mmeanO2 <- 
-  readRDS("results/stan_model_posts_run20221123a.rds")
+# create values of predictor variables to plot
+# run analyze_scallop_grid2.R top part first to creat O2 etc.
+
+```
+# rmeanstrat_mmeanO2 model (one degree) vis
+run20221123a
+surv[p,a,y] = exp(-(f[a,y] + m)) * T_adjust_mort[p,y]
+
+because raw[2:32] = rec_dev[1:31] = mean 0, this is the formula to use:
+n_p_a_y_hat[p,1,y] = mean_recruits * T_adjust_rec[p,y] * exp(raw[y] - pow(sigma_r,2) / 2); with raw[y] set to zero if projecting / averaging
+```{r}
+# load model
+# one degree: rec - meanSBT+strat; mort - meanSBT+O2
+rm <- rmeanstrat_mmeanO2 <- 
+  readRDS("results/stan_model_posts_run20221123a2.rds")
+
+# get parameter info
+quantile(rm$Topt_rec, c(0.025, 0.5, 0.975)) # 8.0
+quantile(rm$width_rec, c(0.025, 0.5, 0.975)) # 2.94
+quantile(rm$Topt_mort, c(0.025, 0.5, 0.975)) # 8.83
+quantile(rm$width_mort, c(0.025, 0.5, 0.975)) # 5.49
+quantile(rm$linbeta0rec, c(0.025, 0.5, 0.975)) # -2.19
+quantile(rm$O2betarec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$stratbetarec, c(0.025, 0.5, 0.975)) # 0.47
+quantile(rm$linbeta0mort, c(0.025, 0.5, 0.975)) # 2.79
+quantile(rm$O2betamort, c(0.025, 0.5, 0.975)) # 1.03
+quantile(rm$stratbetamort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$mean_recruits, c(0.025, 0.5, 0.975)) # 
+quantile(rm$sigma_r, c(0.025, 0.5, 0.975)) # 
 
 # create values of predictor variables to plot
 # run analyze_scallop_grid2.R top part first to creat O2 etc.
+    # need to use same params as stan_data was created with 
 O2pred <- seq(min(O2), max(O2),
               length.out = 100)
 O2predS <- wiqid::standardize2match(O2pred, O2)
@@ -25,10 +50,1152 @@ stratpredS <- wiqid::standardize2match(stratpred, strat)
 
 meanSBTpred <- seq(min(sbt_rec), max(sbt_rec),
               length.out = 100)
+
+####
+## Recruitment covariate effects
+####
+
+# create prediction surface for annual number of recruits
+rec_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(st in 1:100){
+  for(s in 1:100){
+rec_pred[st,s] <- mean(rm$mean_recruits)*plogis(
+  mean(rm$linbeta0rec) + 
+    (mean(rm$stratbetarec) * stratpredS[st]) 
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_rec))/mean(rm$width_rec))^2)*exp((mean(rm$sigma_r)^2) / 2)
+}
+}
+
+rec.mat.df <- rec_pred %>%
+  as.data.frame() %>%
+  mutate(strat = stratpred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of 80mm+ scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 308.0
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 96.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.05, na.rm = T) # 0.06666667
+
+# plot
+(rec_surface <- rec.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = strat, fill = wiqid::standardize(T_adjust))) +  
+  geom_point(data = filter(dat_dens80, mean_dens == 0),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", shape = 1, size = 0.5) + 
+  geom_point(data = filter(dat_dens80, mean_dens > 0 & mean_dens <=0.06666667),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", shape = 1, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens < 308.0 & mean_dens >96.8),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", 
+             fill = "red",
+             shape = 21, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 308.0),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray",
+             fill = "red",
+             size = 4, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Stratification", 
+         fill = "",
+         title = "Expected recruitment") + 
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") 
+  scale_fill_viridis_c(option = "inferno")
+)
+
+ggsave(
+"figures/rmeanstrat_mmeanO2/rec_Tadjust_bivariate_sbt_strat4.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Survival covariate effects
+####
+mort_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+mort_pred[o,s] <- exp(-0.35)*plogis(
+  mean(rm$linbeta0mort) + 
+    (mean(rm$O2betamort) * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_mort))/mean(rm$width_mort))^2)
+}
+}
+
+mort.mat.df <- mort_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# plot
+(surv_surface <- mort.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens == 0),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", shape = 1, size = 0.5) + 
+  geom_point(data = filter(dat_dens80, mean_dens > 0 & mean_dens <=0.06666667),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", shape = 1, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens < 308.0 & mean_dens >96.8),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", 
+             fill = "red",
+             shape = 21, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 308.0),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "red",
+             size = 4, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Expected survival") + 
+    # scale_fill_gradient2(midpoint = 0.5,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab")
+  scale_fill_viridis_c(option = "inferno")
+)
+
+ggsave(
+"figures/rmeanstrat_mmeanO2/mort_Tadjust_bivariate_sbt_O2d.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Map mean recruitment suitability by patch
+####
+
+# calculate survival T_adjust (by cell and year)
+
+ta.df_rec <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm$Topt_rec))/mean(rm$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
+                          mean(rm$stratbetarec)*strat),
+         ta = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp((mean(rm$sigma_r)^2) / 2),
+         ta2 = wiqid::standardize2match(ta, rec.mat.df$T_adjust)
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_rec)
+
+lowerlimit <- min(wiqid::standardize(rec.mat.df$T_adjust))
+upperlimit <- max(wiqid::standardize(rec.mat.df$T_adjust))
+
+# map modeled mean T_adjust_rec across years
+(rec_map <- ta.df_rec %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta2),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean expected recruitment") + 
+    # scale_fill_gradient2(midpoint = 0,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+  scale_fill_viridis_c(option = "inferno") + #, 
+                       # limits = c(lowerlimit, 
+                       # upperlimit)) +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5)) #+
+    #guides(fill = "none")
+)
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_rec_tadjust_predicted_rmeanO2_mmeanO2d.png",
+        height = 5, width = 5, dpi = 400)
+
+####
+## Map mean survival suitability by patch
+####
+
+# calculate survival (not including fishing) by cell and year
+
+ta.df_mort <- dat_dens80 %>%
+      mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm$Topt_mort))/mean(rm$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
+                          mean(rm$O2betamort)*O2),
+         ta = temp_adjust*O2strat_adjust*exp(-0.35)
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean, na.rm = T)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_mort)
+
+lowerlimmort <- min(mort.mat.df$T_adjust)
+upperlimmort <- max(mort.mat.df$T_adjust)
+
+# map modeled mean T_adjust_mort across years
+(surv_map <- ta.df_mort %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean expected survival") + 
+    # scale_fill_gradient2(midpoint = 0.55,
+    #                      low = "steelblue",
+    #                      mid = "white",
+    #                      high = "firebrick", space = "Lab") +
+  scale_fill_viridis_c(option = "inferno") + #,
+                       # limits = c(lowerlimmort,
+                       #            upperlimmort)) +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5)) #+
+    #guides(fill = "none")
+)
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_mort_tadjust_predicted_rmeanstrat_mmeanO2d.png",
+        height = 5, width = 5, dpi = 400)
+
+library(patchwork)
+rec_surface + rec_map + surv_surface + surv_map + plot_layout(ncol = 2, widths = 5, heights = 5)
+ggsave("figures/rmeanstrat_mmeanO2/scallop_predicted_rmeanstrat_mmeanO2d.png",
+        height = 6, width = 8, dpi = 400)
+
+# try mapping expected growth rate instead 
+# then make 2 rows of 3 graphs 
+# ("rec", "mort", "growth rate map")
+# ("col", "ext", "col-ext")
+abund <- apply(rm$dens_p_y_hat80, c(2,3), mean)
+# do a for loop to make a matrix of lambdas
+
+####
+## Time series of abund, mean survival & mean rec across patches
+####
+
+# calculate survival (not including fishing) by cell and year
+
+ta.ts_mort <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm$Topt_mort))/mean(rm$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
+                          mean(rm$O2betamort)*O2),
+         ta = temp_adjust*O2strat_adjust*exp(-0.35)
+         ) %>%
+  group_by(year) %>%
+  summarize(across(where(is.numeric), mean, na.rm = T)) %>%
+  arrange(year) %>%
+  mutate(f = f[14,],
+         mort_mod = 1-apply(rm$surv[,,14,], c(3), mean),
+         mort_calc = 1-temp_adjust*O2strat_adjust*exp(-(0.35+f)),
+         mort_nofish = 1-ta
+         )
+
+raw_lookup <- data.frame(year = 1983:2014, 
+                         raw = apply(rm$raw, 2, mean))
+
+ta.ts_rec <- dat_dens80 %>%
+  left_join(raw_lookup, by = "year") %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm$Topt_rec))/mean(rm$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
+                          mean(rm$stratbetarec)*strat),
+         ta = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp((mean(rm$sigma_r)^2) / 2),
+         ta.raw = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
+         ta.raw.only = mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
+         ta2 = wiqid::standardize2match(ta, rec.mat.df$T_adjust),
+         lta = log(ta)
+         ) %>%
+  group_by(year) %>%
+  summarize(across(where(is.numeric), mean, na.rm = T))
+
+moddens <- apply(apply(rm$dens_p_y_hat80, c(2,3), mean), 2, mean)
+measdens <- meanpatcharea*ta.ts_mort$mean_dens
+
+(density = data.frame(
+  year = rep(1983:2014, 2),
+  dens = c(wiqid::standardize(moddens),
+       wiqid::standardize(measdens)),
+       denstype = c(rep("Modeled", 32),
+                    rep("Measured", 32))) %>%
+    mutate(order = case_when(denstype == "Modeled" ~
+                               1,
+                             TRUE ~ 2)) %>%
+    mutate(denstype = forcats::fct_reorder(denstype, .x = order)) %>%
+    ggplot() +
+    geom_line(aes(x = year, y = dens, linetype = denstype)) +
+    scale_color_manual(values = c("firebrick", "steelblue")) +
+    labs(y = "Mean density (z-scores)", linetype = "", x = "") +
+    theme_bw() +
+    theme(text = element_text(size = 14),
+          legend.position = c(.01,0.99),
+          legend.justification = c(0,1),
+          legend.text=element_text(size=8),
+          legend.title=element_text(size=2))
+)
+
+(mortality = data.frame(
+  year = rep(1983:2014, 2),
+  mort = c(ta.ts_mort$mort_mod,
+       ta.ts_mort$mort_nofish),
+       morttype = c(rep("Fishing + environmental", 32),
+                    rep("Environmental only", 32))) %>%
+    mutate(order = case_when(morttype == "Fishing + environmental" ~
+                               1,
+                             TRUE ~ 2)) %>%
+    mutate(morttype = forcats::fct_reorder(morttype, .x = order)) %>%
+    ggplot() +
+    geom_line(aes(x = year, y = mort, linetype = morttype)) +
+    scale_color_manual(values = c("firebrick", "steelblue")) +
+    labs(y = "Mean mortality", linetype = "", x = "") +
+    theme_bw() +
+    theme(text = element_text(size = 14),
+          legend.position = c(0.99,0.99),
+          legend.justification = c(1,1),
+          legend.text=element_text(size=8),
+          legend.title=element_text(size=2))
+)
+
+(recruit = data.frame(
+  year = rep(1983:2014, 2),
+  rec = c(ta.ts_rec$ta.raw/meanpatcharea,
+       ta.ts_rec$ta/meanpatcharea),
+       rectype = c(rep("Environmental + global deviation", 32),
+                    rep("Environmental only", 32))) %>%
+    ggplot() +
+    geom_line(aes(x = year, y = rec, linetype = rectype)) +
+    scale_color_manual(values = c("firebrick", "steelblue")) +
+    labs(y = "Mean recruitment", color = "", x = "",
+         linetype = "") +
+    theme_bw() +
+    theme(text = element_text(size = 14),
+          legend.position = c(0.01,0.99),
+          legend.justification = c(0,1),
+          legend.text=element_text(size=8),
+          legend.title=element_text(size=2))
+)
+           
+library(patchwork)
+density / mortality / recruit
+ggsave("figures/rmeanstrat_mmeanO2/modeled_time_series.png",
+       height = 9, width = 4, dpi = 400)
+
 ```
+# rmeanO2strat_mmeanO2strat_h model (half degree) vis
+run20221124a
+```{r}
+# load model
+# halfdeg: rec - meanSBT+O2+strat; mort - meanSBT+O2+strat
+rm2h <- rmeanO2strat_mmeanO2strat_h <- 
+  readRDS("results/stan_model_posts_run20221124a.rds")
+
+# get parameter info
+quantile(rm2h$Topt_rec, c(0.025, 0.5, 0.975)) # 6.9
+quantile(rm2h$width_rec, c(0.025, 0.5, 0.975))
+quantile(rm2h$Topt_mort, c(0.025, 0.5, 0.975)) # 10.9
+quantile(rm2h$width_mort, c(0.025, 0.5, 0.975))
+quantile(rm2h$linbeta0rec, c(0.025, 0.5, 0.975))
+quantile(rm2h$O2betarec, c(0.025, 0.5, 0.975)) # 0.90
+quantile(rm2h$stratbetarec, c(0.025, 0.5, 0.975)) # 0.52
+quantile(rm2h$linbeta0mort, c(0.025, 0.5, 0.975))
+quantile(rm2h$O2betamort, c(0.025, 0.5, 0.975)) # 0.31
+quantile(rm2h$stratbetamort, c(0.025, 0.5, 0.975)) # 2.09
+
+# create values of predictor variables to plot
+# run analyze_scallop_grid2.R top part first to creat O2 etc.
+    # need to use same params as stan_data was created with 
+O2pred <- seq(min(O2), max(O2),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2)
+
+stratpred <- seq(min(strat), max(strat),
+              length.out = 100)
+stratpredS <- wiqid::standardize2match(stratpred, strat)
+
+meanSBTpred <- seq(min(sbt_rec), max(sbt_rec),
+              length.out = 100)
+
+# 
+T_adjust_rec_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(st in 1:100){
+  for(s in 1:100){
+T_adjust_rec_pred[st,s] <- plogis(
+  mean(rm2h$linbeta0rec) + 
+    (mean(rm2h$stratbetarec) * 2) + # high level of strat
+    (mean(rm2h$O2betarec) * O2predS[st]) 
+) * exp(-0.5*((meanSBTpred[s]-mean(rm2h$Topt_rec))/mean(rm2h$width_rec))^2)
+}
+}
+
+T_adjust_rec.mat.df <- T_adjust_rec_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_rec.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 161.8),
+             aes(y = O2, x = climvar_rec),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = O2, x = climvar_rec),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanO2strat_mmeanO2strat_h/rec_Tadjust_bivariate_sbt_O2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Survival covariate effects
+####
+T_adjust_mort_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+T_adjust_mort_pred[o,s] <- plogis(
+  mean(rm2h$linbeta0mort) + 
+    (mean(rm2h$O2betamort) * O2predS[o]) +
+    (mean(rm2h$stratbetamort * 2)) # high strat
+) * exp(-0.5*((meanSBTpred[s]-mean(rm2h$Topt_mort))/mean(rm2h$width_mort))^2)
+}
+}
+
+T_adjust_mort.mat.df <- T_adjust_mort_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_mort.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 161.8),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanO2strat_mmeanO2strat_h/mort_Tadjust_bivariate_sbt_O2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Map mean survival suitability by patch
+####
+
+# calculate survival T_adjust (by cell and year)
+
+ta.df_mort <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm2h$Topt_mort))/mean(rm2h$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm2h$linbeta0mort) + 
+                          mean(rm2h$O2betamort)*O2 + 
+                          mean(rm2h$stratbetamort)*strat),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_mort)
+
+# map modeled mean T_adjust_mort across years
+ta.df_mort %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanO2strat_mmeanO2strat_h/scallop_mort_tadjust_predicted_rmeanO2strat_mmeanO2strat.png",
+        height = 5, width = 5, dpi = 400)
+
+####
+## Map mean recruitment suitability by patch
+####
+
+# calculate recruitment T_adjust (by cell and year)
+
+ta.df_rec <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm2h$Topt_rec))/mean(rm2h$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm2h$linbeta0rec) + 
+                          mean(rm2h$O2betarec)*O2 + 
+                          mean(rm2h$stratbetarec)*strat),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_rec)
+
+# map modeled mean T_adjust_rec across years
+ta.df_rec %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanO2strat_mmeanO2strat_h/scallop_rec_tadjust_predicted_rmeanO2strat_mmeanO2strat.png",
+        height = 5, width = 5, dpi = 400)
+```
+# rmeanO2strat_mmeanO2strat_h model (half degree) vis
+run20221128a
+```{r}
+# load model
+# halfdeg: rec - meanSBT+O2; mort - meanSBT+O2
+rm <- rmeanO2_mmeanO2_h <- 
+  readRDS("results/stan_model_posts_run20221128a.rds")
+
+# get parameter info
+quantile(rm$Topt_rec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$width_rec, c(0.025, 0.5, 0.975))
+quantile(rm$Topt_mort, c(0.025, 0.5, 0.975)) #
+quantile(rm$width_mort, c(0.025, 0.5, 0.975))
+quantile(rm$linbeta0rec, c(0.025, 0.5, 0.975))
+quantile(rm$O2betarec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$stratbetarec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$linbeta0mort, c(0.025, 0.5, 0.975))
+quantile(rm$O2betamort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$stratbetamort, c(0.025, 0.5, 0.975)) # 
+
+# create values of predictor variables to plot
+# run analyze_scallop_grid2.R top part first to creat O2 etc.
+    # need to use same params as stan_data was created with 
+O2pred <- seq(min(O2), max(O2),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2)
+
+stratpred <- seq(min(strat), max(strat),
+              length.out = 100)
+stratpredS <- wiqid::standardize2match(stratpred, strat)
+
+meanSBTpred <- seq(min(sbt_rec), max(sbt_rec),
+              length.out = 100)
+
+# 
+T_adjust_rec_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(st in 1:100){
+  for(s in 1:100){
+T_adjust_rec_pred[st,s] <- plogis(
+  mean(rm$linbeta0rec) + 
+    (mean(rm$O2betarec) * O2predS[st]) 
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_rec))/mean(rm$width_rec))^2)
+}
+}
+
+T_adjust_rec.mat.df <- T_adjust_rec_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_rec.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 161.8),
+             aes(y = O2, x = climvar_rec),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = O2, x = climvar_rec),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanO2_mmeanO2_h/rec_Tadjust_bivariate_sbt_O2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Survival covariate effects
+####
+T_adjust_mort_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+T_adjust_mort_pred[o,s] <- plogis(
+  mean(rm$linbeta0mort) + 
+    (mean(rm$O2betamort) * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_mort))/mean(rm$width_mort))^2)
+}
+}
+
+T_adjust_mort.mat.df <- T_adjust_mort_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_mort.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 161.8),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanO2_mmeanO2_h/mort_Tadjust_bivariate_sbt_O2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Map mean survival suitability by patch
+####
+
+# calculate survival T_adjust (by cell and year)
+
+ta.df_mort <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm$Topt_mort))/mean(rm$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
+                          mean(rm$O2betamort)*O2),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_mort)
+
+# map modeled mean T_adjust_mort across years
+ta.df_mort %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanO2_mmeanO2_h/scallop_mort_tadjust_predicted_rmeanO2_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+
+####
+## Map mean recruitment suitability by patch
+####
+
+# calculate recruitment T_adjust (by cell and year)
+
+ta.df_rec <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm$Topt_rec))/mean(rm$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
+                          mean(rm$O2betarec)*O2),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_rec)
+
+# map modeled mean T_adjust_rec across years
+ta.df_rec %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanO2_mmeanO2_h/scallop_rec_tadjust_predicted_rmeanO2_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+```
+
+# rmeanO2_mmeanO2 model (one degree, mean_recruits[p]) vis
+run20221116c (37 patches, mean_recruits by patch)
+```{r}
+# load model
+# one degree: rec - meanSBT+strat; mort - meanSBT+O2
+rm <- rmeanO2_mmeanO2_mrp <- 
+  readRDS("results/stan_model_posts_run20221122b.rds")
+
+# get parameter info
+quantile(rm$Topt_rec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$width_rec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$Topt_mort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$width_mort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$linbeta0rec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$O2betarec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$stratbetarec, c(0.025, 0.5, 0.975)) # 
+quantile(rm$linbeta0mort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$O2betamort, c(0.025, 0.5, 0.975)) # 
+quantile(rm$stratbetamort, c(0.025, 0.5, 0.975)) # 
+
+# create values of predictor variables to plot
+# run analyze_scallop_grid2.R top part first to creat O2 etc.
+    # need to use same params as stan_data was created with 
+O2pred <- seq(min(O2), max(O2),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2)
+
+stratpred <- seq(min(strat), max(strat),
+              length.out = 100)
+stratpredS <- wiqid::standardize2match(stratpred, strat)
+
+meanSBTpred <- seq(min(sbt_rec), max(sbt_rec),
+              length.out = 100)
+
+# 
+T_adjust_rec_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(st in 1:100){
+  for(s in 1:100){
+T_adjust_rec_pred[st,s] <- plogis(
+  mean(rm$linbeta0rec) + 
+    (mean(rm$stratbetarec) * stratpredS[st]) 
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_rec))/mean(rm$width_rec))^2)
+}
+}
+
+T_adjust_rec.mat.df <- T_adjust_rec_pred %>%
+  as.data.frame() %>%
+  mutate(strat = stratpred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_rec.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = strat, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 96.8),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 308.0),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Stratification", 
+         fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanstrat_mmeanO2/rec_Tadjust_bivariate_sbt_strat2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Survival covariate effects
+####
+T_adjust_mort_pred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+T_adjust_mort_pred[o,s] <- plogis(
+  mean(rm$linbeta0mort) + 
+    (mean(rm$O2betamort) * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mean(rm$Topt_mort))/mean(rm$width_mort))^2)
+}
+}
+
+T_adjust_mort.mat.df <- T_adjust_mort_pred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "T_adjust") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of young scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+# plot
+T_adjust_mort.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = T_adjust)) +  
+  geom_point(data = filter(dat_dens80, mean_dens > 96.8),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "transparent",
+             size = 2, shape = 21) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 308.0),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "red",
+             size = 2, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temperature (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab")
+
+ggsave(
+"figures/rmeanstrat_mmeanO2/mort_Tadjust_bivariate_sbt_O2b.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+####
+## Map mean survival suitability by patch
+####
+
+# calculate survival T_adjust (by cell and year)
+
+ta.df_mort <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm$Topt_mort))/mean(rm$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
+                          mean(rm$O2betamort)*O2),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_mort)
+
+# map modeled mean T_adjust_mort across years
+ta.df_mort %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Survival suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_mort_tadjust_predicted_rmeanstrat_mmeanO2b.png",
+        height = 5, width = 5, dpi = 400)
+
+####
+## Map mean recruitment suitability by patch
+####
+
+# calculate survival T_adjust (by cell and year)
+
+ta.df_rec <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm$Topt_rec))/mean(rm$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
+                          mean(rm$stratbetarec)*strat),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df_rec)
+
+# map modeled mean T_adjust_rec across years
+ta.df_rec %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_rec_tadjust_predicted_rmeanO2_mmeanO2b.png",
+        height = 5, width = 5, dpi = 400)
+```
+
+
+
+
+
+
+
+
+
 # Bivariate plot of mean SBT and stratification effects on recruitment 
 rmeanstrat_mmeanO2 model
 ```{r}
+
+rm1 <- readRDS("results/stan_model_posts_run20221123a.rds")
+
 T_adjust_rec_pred <- matrix(NA, nrow = 100, ncol = 100)
 for(st in 1:100){
   for(s in 1:100){
@@ -407,4 +1574,212 @@ ta.df %>%
 
 ggsave("figures/rmeanstrat_mmeanO2/scallop_mort_tadjust_predicted_rmeanstrat_mmeanO2.png",
         height = 5, width = 5, dpi = 400)
+```
+
+# Map mean survival suitability by patch
+```{r}
+# get posteriors for recruitment T_adjust (by cell and year)
+ta <- apply(mmeanO2$T_adjust, c(2,3), mean)
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+ta.mean.all.years = apply(apply(mmeanO2$T_adjust, 
+                                    c(1,2), mean), 2, mean)
+ta.q5.all.years = apply(apply(mmeanO2$T_adjust, 
+                                  c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+
+# put mean t_adjust by cell (across years) into a dataframe for mapping
+ta.df <- data.frame(grid = unique(dat_train_dens$grid)) %>%
+  mutate(ta.mean = ta.mean.all.years,
+         ta.q5 = ta.q5.all.years,
+         grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df)
+
+# map modeled mean T_adjust across years
+ta.df %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta.mean),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean survival suitability (0-1)") + 
+    scale_fill_gradient2(midpoint = 0.75,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/mmeanO2/scallop_rec_tadjust_predicted_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+```
+
+
+
+# Map mean recruitment suitability by patch
+rmeanO2strat_mmeanO2strat (rm2h) model (half degree)
+```{r}
+# load model
+# halfdeg: rec - meanSBT+O2+strat; mort - meanSBT+O2+strat
+rm2h <- rmeanO2strat_mmeanO2strat_h <- 
+  readRDS("results/stan_model_posts_run20221124a.rds")
+
+# calculate recruitment T_adjust (by cell and year)
+
+ta.df <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm2h$Topt_rec))/mean(rm2h$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm2h$linbeta0rec) + 
+                          mean(rm2h$O2betarec) + 
+                          mean(rm2h$stratbetarec)),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(grid) %>%
+  summarize(across(where(is.numeric), mean)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df)
+
+# map modeled mean T_adjust_rec across years
+ta.df %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = ta),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Recruitment suitability") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanO2strat_mmeanO2strat/scallop_rec_tadjust_predicted_rmeanO2strat_mmeanO2strat.png",
+        height = 5, width = 5, dpi = 400)
+```
+
+# Map mean survival suitability by patch
+rmeanstrat_mmeanO2 (rm1) model
+```{r}
+# get posteriors for recruitment T_adjust (by cell and year)
+ta <- apply(rm1$T_adjust_mort, c(2,3), mean)
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+ta.mean.all.years = apply(apply(rm1$T_adjust_mort, 
+                                    c(1,2), mean), 2, mean)
+ta.q5.all.years = apply(apply(rm1$T_adjust_mort, 
+                                  c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+
+# put mean t_adjust by cell (across years) into a dataframe for mapping
+ta.df <- data.frame(grid = unique(dat_train_dens$grid)) %>%
+  mutate(ta.mean = ta.mean.all.years,
+         ta.q5 = ta.q5.all.years,
+         grid_lat = as.numeric(substr(grid, 1,4)),
+         grid_lon = as.numeric(substr(grid, 5,9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(ta.df)
+
+# map modeled mean T_adjust_rec across years
+ta.df %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = (ta.mean-min(ta.mean))/(max(ta.mean)-min(ta.mean))),
+              color = "black") +
+    # geom_point(aes(x = lon, y = lat),
+    #            data = filter(ta.df, ta.q5>0.5),
+    #            shape = "+") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Relative survival") + 
+    scale_fill_gradient2(midpoint = 0.5,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_mort_tadjust_predicted_rmeanstrat_mmeanO2.png",
+        height = 5, width = 5, dpi = 400)
+```
+
+
+# Map mean survival suitability over time
+rmeanO2strat_mmeanO2strat (rm2h) model (half degree)
+```{r}
+# load model
+# halfdeg: rec - meanSBT+O2+strat; mort - meanSBT+O2+strat
+rm2h <- rmeanO2strat_mmeanO2strat_h <- 
+  readRDS("results/stan_model_posts_run20221124a.rds")
+
+# calculate survival T_adjust (average by year)
+
+ta.df.mort <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+                          mean(rm2h$Topt_mort))/mean(rm2h$width_mort))^2),
+         O2strat_adjust = plogis(mean(rm2h$linbeta0mort) + 
+                          mean(rm2h$O2betamort) + 
+                          mean(rm2h$stratbetamort)),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(year) %>%
+  summarize(across(where(is.numeric), mean, na.rm = T))
+
+plot(ta.df.mort$ta, type = "l")
+
+# calculate recruitment T_adjust (average by year)
+
+ta.df.rec <- dat_dens80 %>%
+  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+                          mean(rm2h$Topt_rec))/mean(rm2h$width_rec))^2),
+         O2strat_adjust = plogis(mean(rm2h$linbeta0rec) + 
+                          mean(rm2h$O2betarec) + 
+                          mean(rm2h$stratbetarec)),
+         ta = temp_adjust*O2strat_adjust
+         ) %>%
+  group_by(year) %>%
+  summarize(across(where(is.numeric), mean, na.rm = T))
+
+plot(ta.df.rec$ta, type = "l")
+
+plot(apply(rm2h$raw,2, mean))
 ```
