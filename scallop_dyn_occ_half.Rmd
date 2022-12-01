@@ -915,6 +915,13 @@ jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     strat = strat_matS)
 str(jdata_L0mean)
 
+jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
+    strat = strat_matS)
+str(jdataL0L1a)
+
 jdata_L0meanmax <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
@@ -939,6 +946,16 @@ wanted <- c("Topt1", "width1",
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat <- 
+    jagsUI::jags(jdataL0L1a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.rds")
 
 # psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat
 ( psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat <- 
