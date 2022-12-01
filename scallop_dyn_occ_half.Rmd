@@ -1059,164 +1059,551 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b,
 # Check model output
 ```{r}
 
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2.rds")
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width1
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$width3
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betagamO2
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betapsistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betapsistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betapsistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betaphistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betaphistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betaphistrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$mean$betagamstrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q2.5$betagamstrat
-psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2$q97.5$betagamstrat
-
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2.rds")
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2$q97.5$betagamO2
-
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2.rds")
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2$q97.5$betagamO2
-
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2.rds")
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width1
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$Topt3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$width3
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$mean$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2$q97.5$betagamO2
-
-# model runs with only mean SBT
-
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.rds")
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt1
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width1
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$Topt3
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$width3
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betapsiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betaphiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$mean$betagamO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2$q97.5$betagamO2
-
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$Topt3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$width3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$betagamO2
-
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.rds")
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$Topt3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$width3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$mean$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2$q97.5$betagamO2
-
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
-  readRDS("output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width1
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$Topt3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$width3
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betapsiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betaphiO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$mean$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q2.5$betagamO2
-psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2$q97.5$betagamO2
-
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+mod$mean$Topt1
+mod$mean$width1
+mod$mean$Topt2
+mod$mean$width2
+mod$mean$Topt3
+mod$mean$width3
+mod$mean$betapsiO2
+mod$q2.5$betapsiO2
+mod$q97.5$betapsiO2
+mod$mean$betaphiO2
+mod$q2.5$betaphiO2
+mod$q97.5$betaphiO2
+mod$mean$betagamO2
+mod$q2.5$betagamO2
+mod$q97.5$betagamO2
+mod$mean$betapsistrat
+mod$q2.5$betapsistrat
+mod$q97.5$betapsistrat
+mod$mean$betaphistrat
+mod$q2.5$betaphistrat
+mod$q97.5$betaphistrat
+mod$mean$betagamstrat
+mod$q2.5$betagamstrat
+mod$q97.5$betagamstrat
 
 
 ```
+# Map mean colonization - extinction by patch
+Model: psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+```{r}
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+# get posteriors for colonization (by cell and year)
+col.p <- 
+  mod$sims.list$gamma
+
+# get posteriors for extinction (by cell and year)
+ext.p <-
+  1-mod$sims.list$phi
+
+# get posteriors for col - ext (by cell and year)
+colext.p <- col.p - ext.p
+rm(col.p, ext.p)
+
+# get mean & LL of posterior for mean col - ext by cell (across years)
+colext.mean.all.years = apply(apply(colext.p, c(1,2), mean), 2, mean)
+colext.q5.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.05))
+colext.q95.all.years = apply(apply(colext.p, c(1,2), mean), 2, 
+                            function(x)quantile(x, 0.95))
+
+# put mean col-ext by cell (across years) into a dataframe for mapping
+colext <- ymat_gridnames %>%
+  mutate(colext.mean = colext.mean.all.years,
+         colext.q5 = colext.q5.all.years,
+         colext.q95 = colext.q95.all.years,
+         grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext)
+
+# map modelled mean col-ext for 1983-2014
+(colext_map <- colext %>%
+    ggplot() +
+    geom_tile(aes(x = lon, y = lat, fill = colext.mean),
+              color = "black") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q5>0),
+               shape = "+") +
+    geom_point(aes(x = lon, y = lat),
+               data = filter(colext, colext.q95<0),
+               shape = "-") +
+    geom_sf(data = state_bounds, aes(), color = "gray",
+            size = .25) +  theme_bw() +
+    theme(text = element_text(size = 15),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "", y = "", fill = "",
+         title = "Mean colonization - extinction") + 
+    scale_fill_gradient2(midpoint = 0,
+                         low = "steelblue",
+                         mid = "white",
+                         high = "firebrick", space = "Lab") +
+    theme(text = element_text(size = 14),
+          title = element_text(size = 12, hjust = 0.5))
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/scallop_dynocc_predicted_colext_rmeanstrat_mmaxO2.png",
+        height = 5, width = 5, dpi = 400)
+```
+# plot col-ext - bivariate surface vs SBT and O2
+model: psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+```{r}
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+# find a typical value for phi intercept
+mod$mean$phiInt
+median(mod$mean$phiInt) # 0.9091696
+# year 23 is median phi annual intercept
+
+# find a typical value for gam intercept
+mod$mean$gamInt
+median(mod$mean$gamInt) # 0.2270931
+# year 15 is median phi annual intercept; year 23 is close
+
+O2pred <- seq(min(dat_train_dens80_occ$O2), 
+              max(dat_train_dens80_occ$O2),
+              length.out = 100)
+O2predS <- wiqid::standardize2match(O2pred, O2_mat)
+
+stratpred <- seq(min(dat_train_dens80_occ$strat), 
+              max(dat_train_dens80_occ$strat),
+              length.out = 100)
+stratpredS <- wiqid::standardize2match(stratpred, strat_mat)
+
+meanSBTpred <- seq(min(dat_train_dens80_occ$mean_temp), 
+              max(dat_train_dens80_occ$mean_temp),
+              length.out = 100)
+
+phipred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+phipred[o,s] <- plogis(
+  qlogis(median(mod$mean$phiInt)) + 
+    (mod$mean$betaphiO2 * O2predS[o])
+) * exp(-0.5*((meanSBTpred[s]-mod$mean$Topt2)/mod$mean$width2)^2)
+}
+}
+
+gampred <- matrix(NA, nrow = 100, ncol = 100)
+for(o in 1:100){
+  for(s in 1:100){
+gampred[o,s] <- plogis(
+  qlogis(median(mod$mean$gamInt)) + 
+    (mod$mean$betagamstrat * stratpredS[o])
+) * exp(-0.5*((meanSBTpred[s]-mod$mean$Topt3)/mod$mean$width3)^2)
+}
+}
+
+gam.mat.df <- gampred %>%
+  as.data.frame() %>%
+  mutate(strat = stratpred) %>%
+  pivot_longer(cols = 1:100, values_to = "gamma") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+phi.mat.df <- phipred %>%
+  as.data.frame() %>%
+  mutate(O2 = O2pred) %>%
+  pivot_longer(cols = 1:100, values_to = "phi") %>%
+  mutate(mean_temp = rep(meanSBTpred, 100))
+
+# find cells/years with lots of 80mm+ scallops
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.99, na.rm = T) # 586.1
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.95, na.rm = T) # 161.8
+quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens, 
+         0.05, na.rm = T) # 0.1963636
+
+(col_biv <- gam.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = strat, fill = gamma)) +  
+  geom_point(data = filter(dat_dens80, mean_dens == 0),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", shape = 1, size = 0.5) + 
+  geom_point(data = filter(dat_dens80, mean_dens > 0 & mean_dens <=0.1963636),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", shape = 1, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens < 586.1 & mean_dens >161.8143),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray", 
+             fill = "red",
+             shape = 21, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = strat, x = climvar_rec),
+             color = "darkgray",
+             fill = "red",
+             size = 4, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temp. (C)", 
+         y = "Stratification", 
+         fill = "",
+         title = "Colonization probability") + 
+  scale_fill_viridis_c(option = "inferno")
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_bivariate_sbt_strat.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+# plot predicted "persistence" (phi) vs. O2 & mean SBT
+(phi_biv <- phi.mat.df %>%
+  ggplot() +
+  geom_tile(aes(x = mean_temp,
+                y = O2, fill = phi)) +  
+  geom_point(data = filter(dat_dens80, mean_dens == 0),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", shape = 1, size = 0.5) + 
+  geom_point(data = filter(dat_dens80, mean_dens > 0 & mean_dens <=0.1963636),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", shape = 1, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens < 586.1 & mean_dens >161.8143),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray", 
+             fill = "red",
+             shape = 21, size = 2) +
+  geom_point(data = filter(dat_dens80, mean_dens >= 586.1),
+             aes(y = O2, x = climvar_mort),
+             color = "darkgray",
+             fill = "red",
+             size = 4, shape = 21) +
+  theme_bw() +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 10),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 8)) +
+    labs(x = "Mean bottom temp. (C)", 
+         y = "Oxygen concentration", 
+         fill = "",
+         title = "Persistence probability") + 
+  scale_fill_viridis_c(option = "inferno")
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/phi_bivariate_sbt_O2.png", 
+       height = 4, width = 6,
+       dpi = 400)
+
+library(patchwork)
+col_biv + phi_biv + colext_map + plot_layout(ncol = 3, 
+                                             widths = 5, heights = 5)
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_phi_colextmap.png",
+       height = 3, width = 12, dpi = 400)
+
+(colext_map / (col_biv + phi_biv)) + plot_layout(widths = 5, 
+                                                 heights = 5)
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_phi_colextmap2.png",
+       height = 6, width = 8, dpi = 400)
+
+```
+
+# plot predicted N over time
+```{r}
+plot(mod$mean$N, 
+     type = "l")
+
+N.plot <- data.frame(
+  year = 1983:2014,
+  N = mod$mean$N,
+  q2.5 = mod$q2.5$N,
+  q97.5 = mod$q97.5$N,
+  q10 = apply(
+    mod$sims.list$N, 2,
+    function(x)quantile(x, 0.1)),
+  q90 = apply(
+    mod$sims.list$N, 2,
+    function(x)quantile(x, 0.9)),
+  type = "80mm+") # %>%
+  # bind_rows(
+  #   data.frame(
+  # N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$N,
+  # year = 1983:2014,
+  # q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$N,
+  # q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$N,
+  # q10 = apply(
+  #   psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
+  #   function(x)quantile(x, 0.1)),
+  # q90 = apply(
+  #   psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
+  #   function(x)quantile(x, 0.9)),
+  # type = "Any 80mm+")
+# )
+
+gam.plot <- apply(apply(mod$sims.list$gamma, c(1,3), mean), 2, 
+      function(x)quantile(x, c(0.025, .1, 0.5, .9, 0.975))) %>%
+  t() %>%
+  as.data.frame() %>%
+  rename(q2.5 = 1, q10 = 2, col = 3, 
+         q90 = 4, q97.5 = 5) %>%
+  mutate(year = 1983:2013,
+         type = "80mm+")
+
+phi.plot <- apply(apply(mod$sims.list$phi, c(1,3), mean), 2, 
+      function(x)quantile(x, c(0.025, .1, 0.5, .9, 0.975))) %>%
+  t() %>%
+  as.data.frame() %>%
+  rename(q2.5 = 1, q10 = 2, phi = 3, 
+         q90 = 4, q97.5 = 5) %>%
+  mutate(year = 1983:2013,
+         type = "80mm+")
+
+# plot N over time
+(np <- N.plot %>%
+  ggplot() +
+  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5),
+              alpha = 0.25) +
+  geom_ribbon(aes(x = year, ymin = q10, ymax = q90),
+              alpha = 0.25) +
+  geom_line(aes(x = year, y = N),
+            size = 1) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  labs(fill = "", color = "",
+       y = "No. occupied cells (out of 116)",
+       x = "") +
+  theme_bw()
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches_over_time.png",
+       height = 4, width = 5, dpi = 400)
+
+# plot mean colonization rate over time
+(gp <- gam.plot %>%
+  ggplot() +
+  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5),
+              alpha = 0.25) +
+  geom_ribbon(aes(x = year, ymin = q10, ymax = q90),
+              alpha = 0.25) +
+  geom_line(aes(x = year, y = col),
+            size = 1) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  labs(fill = "", color = "",
+       y = "Colonization rate",
+       x = "") +
+  theme_bw()
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col_over_time.png",
+       height = 4, width = 5, dpi = 400)
+
+# plot mean persistence rate over time
+(pp <- phi.plot %>%
+  ggplot() +
+  geom_ribbon(aes(x = year, ymin = 1-q2.5, ymax = 1-q97.5),
+              alpha = 0.25) +
+  geom_ribbon(aes(x = year, ymin = 1-q10, ymax = 1-q90),
+              alpha = 0.25) +
+  geom_line(aes(x = year, y = 1-phi),
+            size = 1) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  labs(fill = "", color = "",
+       y = "Extinction rate",
+       x = "") +
+  theme_bw()
+)
+
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_ext_over_time.png",
+       height = 4, width = 5, dpi = 400)
+
+library(patchwork)
+np/pp/gp
+ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_gam_phi.png",
+       height = 9, width = 4, dpi = 400)
+
+```
+
+
+
+
+
+
+
+
+
+
+# Mapping mean Colonization - Extinction (test period)
+```{r}
+out <- readRDS("output/out_meansbt_gaus4.rds")
+
+colext_mat <- apply(out$sims.list$colminusext_proj, c(2,3), median)
+colext_mean <- apply(colext_mat, 1, mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1) %>%
+  mutate(grid = unique(dat_train_dens80_occ$grid)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
+         grid_lon = as.numeric(substr(grid, 5, 9)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(colext_mean)
+
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = colext),
+            # alpha = 1,
+            data = colext_mean,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  labs(x = "", y = "", fill = "Mean predicted\ncolonization - extinction rate\n(2005-2014)",
+       title = "Dynamic occupancy model\n(based on mean SBT)") + 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12))
+
+ggsave("figures/dynocc/projected_colext.png", 
+       height = 6, width = 6, dpi = 400)
+```
+
+
+
+# Map col-ext for training set for model with and without O2
+```{r}
+out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
+out_meansbt_gausO2 <- readRDS("output/out_meansbt_gaus_O2.rds")
+params_gaus <- out_meansbt_gaus$mean
+params_gausO2 <- out_meansbt_gausO2$mean
+
+colext_gaus <- params_gaus$gamma-(1-params_gaus$phi) %>%
+  apply(.,1,mean) %>%
+  as.data.frame() %>%
+  rename(colext = 1)
+```
+
+# Mapping change in psi over time
+```{r}
+# http://www.seec.uct.ac.za/dynamic-occupancy-models
+# We estimated occupancy in the first year, \(\Psi_1\). But what about occupancy probabilities in subsequent years? They are derived parameters, calculated as \(\Psi_t = \Psi_{t-1} \times (1-\epsilon_{t-1}) + (1-\Psi_{t-1}) \times \gamma_{t-1}\).
+
+psix <- params$psiInt*(exp(-0.5*((meansbt_mat[,1]-params$Topt1)/params$width1)^2))
+phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
+gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
+```
+# map scallop abundance (1983-1997) & (1999-2014)
+```{r}
+
+obs80_rmean_train1 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens) %>%
+  filter(year %in% 1983:1998) %>%
+  group_by(grid) %>%
+  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+obs80_rmean_train2 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1979,
+         obs80 = mean_dens) %>%
+  filter(year %in% 1999:2014) %>%
+  group_by(grid) %>%
+  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
+  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
+         grid_lon = as.numeric(substr(grid, 6,11)),
+         lat = grid_lat,
+         lon = grid_lon) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+
+# map observed density, 1983-1998  
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
+            data = obs80_rmean_train1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
+       title = "Observed density, 1983-1998") + 
+  scale_fill_viridis_c(option = "inferno",
+                       limits = c(0,520)) +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+
+ggsave("figures/dynocc/obsdens80_1983_1998.png", 
+       height = 6, width = 6, dpi = 400)
+
+# map observed density, 1999-2014  
+ggplot() +
+  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
+            data = obs80_rmean_train2,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
+       title = "Observed density, 1999-2014") + 
+  scale_fill_viridis_c(option = "inferno",
+                       limits = c(0,520)) +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) 
+
+ggsave("figures/dynocc/obsdens80_1999_2014.png", 
+       height = 6, width = 6, dpi = 400)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Map mean colonization - extinction by patch
 Model: psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat
 ```{r}
@@ -1592,158 +1979,35 @@ colext %>%
 ggsave("figures/dynocc/scallop_dynocc_predicted_colext_95pct.png",
         height = 5, width = 5, dpi = 400)
 ```
-# map scallop abundance (1983-1997) & (1999-2014)
-```{r}
-
-obs80_rmean_train1 <- dat_train_dens80 %>%
-  arrange(patch, year) %>%
-  mutate(year = year + 1979,
-         obs80 = mean_dens) %>%
-  filter(year %in% 1983:1998) %>%
-  group_by(grid) %>%
-  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
-  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
-         grid_lon = as.numeric(substr(grid, 6,11)),
-         lat = grid_lat,
-         lon = grid_lon) %>%
-  st_as_sf(coords = c("grid_lon", "grid_lat"),
-           crs = 4326)
-
-obs80_rmean_train2 <- dat_train_dens80 %>%
-  arrange(patch, year) %>%
-  mutate(year = year + 1979,
-         obs80 = mean_dens) %>%
-  filter(year %in% 1999:2014) %>%
-  group_by(grid) %>%
-  summarize(mean_dens = mean(mean_dens, na.rm = T)) %>%
-  mutate(grid_lat = as.numeric(substr(grid, 1,5)),
-         grid_lon = as.numeric(substr(grid, 6,11)),
-         lat = grid_lat,
-         lon = grid_lon) %>%
-  st_as_sf(coords = c("grid_lon", "grid_lat"),
-           crs = 4326)
-
-# map observed density, 1983-1998  
-ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
-            data = obs80_rmean_train1,
-            color = "black") +
-  geom_sf(data = state_bounds, aes(), color = "gray",
-          size = .25) +  theme_bw() +
-  theme(text = element_text(size = 15),
-        axis.text = element_text(size = 6),
-        legend.title = element_text(size = 8),
-        legend.text = element_text(size = 8)) +
-  viridis::scale_color_viridis(option = "inferno") +
-  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
-       title = "Observed density, 1983-1998") + 
-  scale_fill_viridis_c(option = "inferno",
-                       limits = c(0,520)) +
-  theme(text = element_text(size = 14),
-        title = element_text(size = 12)) 
-
-ggsave("figures/dynocc/obsdens80_1983_1998.png", 
-       height = 6, width = 6, dpi = 400)
-
-# map observed density, 1999-2014  
-ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = mean_dens),
-            data = obs80_rmean_train2,
-            color = "black") +
-  geom_sf(data = state_bounds, aes(), color = "gray",
-          size = .25) +  theme_bw() +
-  theme(text = element_text(size = 15),
-        axis.text = element_text(size = 6),
-        legend.title = element_text(size = 8),
-        legend.text = element_text(size = 8)) +
-  viridis::scale_color_viridis(option = "inferno") +
-  labs(x = "", y = "", fill = "Mean n\nper tow\n(80mm+)",
-       title = "Observed density, 1999-2014") + 
-  scale_fill_viridis_c(option = "inferno",
-                       limits = c(0,520)) +
-  theme(text = element_text(size = 14),
-        title = element_text(size = 12)) 
-
-ggsave("figures/dynocc/obsdens80_1999_2014.png", 
-       height = 6, width = 6, dpi = 400)
-
-
-```
-# plot predicted N over time
-```{r}
-plot(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$mean$N, 
-     type = "l")
-
-N.plot <- data.frame(
-  year = 1983:2014,
-  N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$mean$N,
-  q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$q2.5$N,
-  q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$q97.5$N,
-  q10 = apply(
-    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$N, 2,
-    function(x)quantile(x, 0.1)),
-  q90 = apply(
-    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b$sims.list$N, 2,
-    function(x)quantile(x, 0.9)),
-  type = "Abundant 80mm+") %>%
-  bind_rows(
-    data.frame(
-  N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$N,
-  year = 1983:2014,
-  q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$N,
-  q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$N,
-  q10 = apply(
-    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
-    function(x)quantile(x, 0.1)),
-  q90 = apply(
-    psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
-    function(x)quantile(x, 0.9)),
-  type = "Any 80mm+")
-)
-
-N.plot %>%
-  ggplot() +
-  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5,
-                  fill = type, group = type),
-              alpha = 0.25) +
-  geom_ribbon(aes(x = year, ymin = q10, ymax = q90,
-                  fill = type),
-              alpha = 0.25) +
-  geom_line(aes(x = year, y = N, color = type, group = type),
-            size = 1) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
-  scale_fill_manual(values = c("firebrick", "steelblue")) +
-  labs(fill = "", color = "",
-       y = "No. occupied cells (out of 120)",
-       x = "") +
-  theme_bw()
-
-ggsave("figures/dynocc/no_occ_patches.png",
-       height = 4, width = 5, dpi = 400)
-
-
-```
+# saving this here in case we do a model that allows bivariate colext plot
 # plot col-ext - bivariate surface vs SBT and O2
+model: psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
 ```{r}
-mod <- psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
+mod <- 
+  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
 
 # find a typical value for phi intercept
 mod$mean$phiInt
-median(mod$mean$phiInt)
+median(mod$mean$phiInt) # 0.9091696
 # year 23 is median phi annual intercept
 
 # find a typical value for gam intercept
 mod$mean$gamInt
-median(mod$mean$gamInt)
+median(mod$mean$gamInt) # 0.2270931
 # year 15 is median phi annual intercept; year 23 is close
 
-O2pred <- seq(min(dat_train_dens80_occ$O2L1), 
-              max(dat_train_dens80_occ$O2L1),
+O2pred <- seq(min(dat_train_dens80_occ$O2), 
+              max(dat_train_dens80_occ$O2),
               length.out = 100)
-O2predS <- wiqid::standardize2match(O2pred, O2L1_mat)
+O2predS <- wiqid::standardize2match(O2pred, O2_mat)
 
-meanSBTpred <- seq(min(dat_train_dens80_occ$mean_tempL1), 
-              max(dat_train_dens80_occ$mean_tempL1),
+stratpred <- seq(min(dat_train_dens80_occ$strat), 
+              max(dat_train_dens80_occ$strat),
+              length.out = 100)
+stratpredS <- wiqid::standardize2match(stratpred, strat_mat)
+
+meanSBTpred <- seq(min(dat_train_dens80_occ$mean_temp), 
+              max(dat_train_dens80_occ$mean_temp),
               length.out = 100)
 
 phipred <- matrix(NA, nrow = 100, ncol = 100)
@@ -1761,7 +2025,7 @@ for(o in 1:100){
   for(s in 1:100){
 gampred[o,s] <- plogis(
   qlogis(mod$mean$gamInt[15]) + 
-    (mod$mean$betagamO2 * O2predS[o])
+    (mod$mean$betagamstrat * stratpredS[o])
 ) * exp(-0.5*((meanSBTpred[s]-mod$mean$Topt3)/mod$mean$width3)^2)
 }
 }
@@ -1805,123 +2069,4 @@ colext.mat.df %>%
 ggsave("figures/dynocc/colext_bivariate_sbt_o2.png", 
        height = 4, width = 6,
        dpi = 400)
-```
-
-
-
-
-# plot effects - Gaussian mean SBT model
-```{r}
-out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
-# out_meansbt_gaus <- readRDS("output/out_meansbt_gaus_O2.rds")
-
-plot(out_meansbt_gaus$mean$N, type = "l")
-
-range(meansbt_mat)  #  3.983414 18.407284
-cx <- seq(4, 18.4, length=101)
-
-params <- out_meansbt_gaus$mean
-
-lpsix <- with(params, qlogis(psiInt))
-psix <- plogis(lpsix)*(exp(-0.5*((cx-params$Topt1)/params$width1)^2))
-plot(cx, psix, type='l', lwd=2,
-    xlab="Mean SBT", ylab="Initial occupancy, psi")
-
-lphix <- matrix(NA, 101, 37)
-for(i in 1:37) {
-  lphix[,i] <- with(params, qlogis(phiInt[i]))
-phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
-matplot(cx, phix, type='l', lty=1, lwd=2,
-    xlab="Mean SBT", ylab="Persistence, phi")
-}
-
-lgamx <- matrix(NA, 101, 37)
-for(i in 1:37){
-  lgamx[,i] <- with(params, qlogis(gamInt[i]))
-gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
-matplot(cx, gamx, type='l', lty=1, lwd=2,
-    xlab="Mean SBT", ylab="Colonisation, gamma")
-}
-
-ldiffx <- matrix(NA, 101, 37)
-for(i in 1:37){
-    lgamx[,i] <- with(params, qlogis(gamInt[i]))
-    lphix[,i] <- with(params, qlogis(phiInt[i]))
-phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
-gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
-extx <- 1-phix
-diffx <- gamx - extx
-matplot(cx, diffx, type='l', lty=1, lwd=2,
-    xlab="Mean SBT", ylab="Colonisation - Extinction")
-abline(h = 0, lty = 2)
-}
-```
-# Mapping mean Colonization - Extinction (test period)
-```{r}
-out <- readRDS("output/out_meansbt_gaus4.rds")
-
-colext_mat <- apply(out$sims.list$colminusext_proj, c(2,3), median)
-colext_mean <- apply(colext_mat, 1, mean) %>%
-  as.data.frame() %>%
-  rename(colext = 1) %>%
-  mutate(grid = unique(dat_train_dens80_occ$grid)) %>%
-  mutate(grid_lat = as.numeric(substr(grid, 1, 4)),
-         grid_lon = as.numeric(substr(grid, 5, 9)),
-         lat = grid_lat,
-         lon = grid_lon) %>%
-  sf::st_as_sf(coords = c("grid_lon", "grid_lat"),
-           crs = 4326)
-
-state_bounds <- ne_coastline(scale = 10, returnclass = "sf") %>%
-  st_crop(colext_mean)
-
-ggplot() +
-  geom_tile(aes(x = lon, y = lat, fill = colext),
-            # alpha = 1,
-            data = colext_mean,
-            color = "black") +
-  geom_sf(data = state_bounds, aes(), color = "gray",
-          size = .25) +  theme_bw() +
-  theme(text = element_text(size = 15),
-        axis.text = element_text(size = 6),
-        legend.title = element_text(size = 8),
-        legend.text = element_text(size = 8)) +
-  labs(x = "", y = "", fill = "Mean predicted\ncolonization - extinction rate\n(2005-2014)",
-       title = "Dynamic occupancy model\n(based on mean SBT)") + 
-  scale_fill_gradient2(midpoint = 0, 
-                       low = "steelblue", 
-                       mid = "white",
-                       high = "firebrick", space = "Lab") +
-  theme(text = element_text(size = 14),
-        title = element_text(size = 12))
-
-ggsave("figures/dynocc/projected_colext.png", 
-       height = 6, width = 6, dpi = 400)
-```
-
-
-
-
-
-# Map col-ext for training set for model with and without O2
-```{r}
-out_meansbt_gaus <- readRDS("output/out_meansbt_gaus4.rds")
-out_meansbt_gausO2 <- readRDS("output/out_meansbt_gaus_O2.rds")
-params_gaus <- out_meansbt_gaus$mean
-params_gausO2 <- out_meansbt_gausO2$mean
-
-colext_gaus <- params_gaus$gamma-(1-params_gaus$phi) %>%
-  apply(.,1,mean) %>%
-  as.data.frame() %>%
-  rename(colext = 1)
-```
-
-# Mapping change in psi over time
-```{r}
-# http://www.seec.uct.ac.za/dynamic-occupancy-models
-# We estimated occupancy in the first year, \(\Psi_1\). But what about occupancy probabilities in subsequent years? They are derived parameters, calculated as \(\Psi_t = \Psi_{t-1} \times (1-\epsilon_{t-1}) + (1-\Psi_{t-1}) \times \gamma_{t-1}\).
-
-psix <- params$psiInt*(exp(-0.5*((meansbt_mat[,1]-params$Topt1)/params$width1)^2))
-phix <- plogis(lphix)*(exp(-0.5*((cx-params$Topt2)/params$width2)^2))
-gamx <- plogis(lgamx)*(exp(-0.5*((cx-params$Topt3)/params$width3)^2))
 ```

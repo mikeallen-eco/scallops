@@ -109,13 +109,15 @@ quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens,
     labs(x = "Mean bottom temperature (C)", 
          y = "Stratification", 
          fill = "",
-         title = "Expected recruitment") + 
+         title = "Recruitment") + 
     # scale_fill_gradient2(midpoint = 0,
     #                      low = "steelblue",
     #                      mid = "white",
     #                      high = "firebrick", space = "Lab") 
   scale_fill_viridis_c(option = "inferno")
 )
+
+# saveRDS(rec_surface, "figures/rmeanstrat_mmeanO2/rec_surface.rds")
 
 ggsave(
 "figures/rmeanstrat_mmeanO2/rec_Tadjust_bivariate_sbt_strat4.png", 
@@ -170,13 +172,15 @@ mort.mat.df <- mort_pred %>%
     labs(x = "Mean bottom temperature (C)", 
          y = "Oxygen concentration", 
          fill = "",
-         title = "Expected survival") + 
+         title = "Survival") + 
     # scale_fill_gradient2(midpoint = 0.5,
     #                      low = "steelblue",
     #                      mid = "white",
     #                      high = "firebrick", space = "Lab")
   scale_fill_viridis_c(option = "inferno")
 )
+
+# saveRDS(surv_surface, "figures/rmeanstrat_mmeanO2/surv_surface.rds")
 
 ggsave(
 "figures/rmeanstrat_mmeanO2/mort_Tadjust_bivariate_sbt_O2d.png", 
