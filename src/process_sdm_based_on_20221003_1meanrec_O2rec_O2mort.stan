@@ -182,9 +182,9 @@ parameters{
   
   real linbeta0rec; // intercept for logistic function vs. recruitment
   
-  // real O2betarec; // slope for O2 in logistic function vs. recruitment
+  real O2betarec; // slope for O2 in logistic function vs. recruitment
   
-  real stratbetarec; // slope for stratification in logistic function vs. recruitment
+  // real stratbetarec; // slope for stratification in logistic function vs. recruitment
 
   real linbeta0mort; // intercept for logistic function vs. survival
   
@@ -309,7 +309,7 @@ if(T_dep_recruitment == 1){
   // calculate temperature-dependence correction factor for each patch and year depending on sbt
   for(p in 1:np){
     for(y in 1:ny_train){
-      T_adjust_rec[p,y] = T_dep_rec(sbt_rec[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + stratbetarec*strat[p,y]);  
+      T_adjust_rec[p,y] = T_dep_rec(sbt_rec[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + O2betarec*O2[p,y]);  
       // print("T_adjust in patch", p, " and year ",y," is ",T_adjust[p,y]);
 
     } // close years
@@ -531,9 +531,9 @@ model {
   
   linbeta0rec ~ normal(0, 1.4);
 
-  // O2betarec ~ normal(0, 5);
+  O2betarec ~ normal(0, 2);
   
-  stratbetarec ~ normal(0, 2);
+  // stratbetarec ~ normal(0, 5);
 
   linbeta0mort ~ normal(0, 1.4);
 
@@ -636,7 +636,7 @@ generated quantities {
   if(run_forecast==1){
   for(p in 1:np){
     for(y in 1:ny_proj){
-      T_adjust_rec_proj[p,y] = T_dep_rec(sbt_rec_proj[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + stratbetarec*strat_proj[p,y]);
+      T_adjust_rec_proj[p,y] = T_dep_rec(sbt_rec_proj[p,y], Topt_rec, width_rec) * inv_logit(linbeta0rec + O2betarec*O2_proj[p,y]);
     } // close years
   } // close patches
   
