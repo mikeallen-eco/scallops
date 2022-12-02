@@ -1167,7 +1167,7 @@ mod <-
 # find a typical value for phi intercept
 mod$mean$phiInt
 median(mod$mean$phiInt) # 0.9091696
-# year 23 is median phi annual intercept
+# median phi annual intercept
 
 # find a typical value for gam intercept
 mod$mean$gamInt
@@ -1256,11 +1256,15 @@ quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens,
     labs(x = "Mean bottom temp. (C)", 
          y = "Stratification", 
          fill = "",
-         title = "Colonization probability") + 
+         title = "Colonization") + 
   scale_fill_viridis_c(option = "inferno")
 )
 
-ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_bivariate_sbt_strat.png", 
+saveRDS(col_biv,
+          "figures/rmeanstrat_mmeanO2_h_dynocc/colonize_surface.rds")
+
+ggsave(paste0("figures/rmeanstrat_mmeanO2_h_dynocc/",
+              "col_bivariate_sbt_strat.png"), 
        height = 4, width = 6,
        dpi = 400)
 
@@ -1293,10 +1297,13 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_bivariate_sbt_strat.png",
     labs(x = "Mean bottom temp. (C)", 
          y = "Oxygen concentration", 
          fill = "",
-         title = "Persistence probability") + 
+         title = "Persistence") + 
   scale_fill_viridis_c(option = "inferno")
 )
 
+saveRDS(phi_biv,
+          "figures/rmeanstrat_mmeanO2_h_dynocc/persist_surface.rds")
+  
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/phi_bivariate_sbt_O2.png", 
        height = 4, width = 6,
        dpi = 400)
@@ -1313,7 +1320,6 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_phi_colextmap2.png",
        height = 6, width = 8, dpi = 400)
 
 ```
-
 # plot predicted N over time
 ```{r}
 plot(mod$mean$N, 

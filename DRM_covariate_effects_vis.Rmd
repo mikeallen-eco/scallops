@@ -316,7 +316,7 @@ ggsave("figures/rmeanstrat_mmeanO2/scallop_predicted_rmeanstrat_mmeanO2d.png",
 # ("rec", "mort", "growth rate map")
 # ("col", "ext", "col-ext")
 abund <- apply(rm$dens_p_y_hat80, c(2,3), mean)
-# do a for loop to make a matrix of lambdas
+
 
 ####
 ## Time series of abund, mean survival & mean rec across patches
