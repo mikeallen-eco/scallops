@@ -1146,7 +1146,7 @@ state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
           legend.title = element_text(size = 8),
           legend.text = element_text(size = 8)) +
     labs(x = "", y = "", fill = "",
-         title = "Mean colonization - extinction") + 
+         title = "Colonization - extinction") + 
     scale_fill_gradient2(midpoint = 0,
                          low = "steelblue",
                          mid = "white",
@@ -1154,6 +1154,10 @@ state_bounds <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
     theme(text = element_text(size = 14),
           title = element_text(size = 12, hjust = 0.5))
 )
+
+saveRDS(colext, "figures/rmeanstrat_mmeanO2_h_dynocc/colext.rds")
+saveRDS(colext_map,
+        "figures/rmeanstrat_mmeanO2_h_dynocc/colext_map.rds")
 
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/scallop_dynocc_predicted_colext_rmeanstrat_mmaxO2.png",
         height = 5, width = 5, dpi = 400)
