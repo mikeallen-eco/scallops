@@ -70,8 +70,8 @@ T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
-btemp_meas_rec <- "mean" # "min", "mean", "max", or "O2"
-btemp_meas_mort <- "mean" # "min", "mean", "max", or "O2"
+btemp_meas_rec <- "min" # "min", "mean", "max", or "O2"
+btemp_meas_mort <- "max" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -749,8 +749,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221124a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221124a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221214a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221214a.rds"))
 
 warmups <- 2000 # was 1000 during testing
 total_iterations <- 3200 # warmup + 1000 has been working ok
@@ -849,15 +849,16 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                 "linbeta0rec", "stratbetarec", # "O2betarec", 
                                 "linbeta0mort", "O2betamort", #"stratbetamort", 
                                 "mean_recruits", "surv", "beta_obs", "sigma_r",
-                                "raw", "rec_dev"),
+                                "raw", "dens_p_y_hat80", "sigma_obs", "p_length_50_sel",
+                                "theta_d"),
                        save_warmup = F,
                        save_dso = F,
                        control = list(max_treedepth = max_treedepth,
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221129a.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221123a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221214a.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221214a.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -895,13 +896,13 @@ Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
 width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort,
 surv = rstan::extract(stan_model_fit, "surv")$surv,
 raw = rstan::extract(stan_model_fit, "raw")$raw,
-sigma_r = rstan::extract(stan_model_fit, "sigma_r")$sigma_r
-# dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80,
+sigma_r = rstan::extract(stan_model_fit, "sigma_r")$sigma_r,
+dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80
 # proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221129a.rds")
+saveRDS(post, "results/stan_model_posts_run20221201a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
