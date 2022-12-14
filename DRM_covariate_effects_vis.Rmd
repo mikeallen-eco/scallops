@@ -109,13 +109,15 @@ quantile(dat_dens80[dat_dens80$mean_dens>0,]$mean_dens,
     labs(x = "Mean bottom temperature (C)", 
          y = "Stratification", 
          fill = "",
-         title = "Expected recruitment") + 
+         title = "Recruitment") + 
     # scale_fill_gradient2(midpoint = 0,
     #                      low = "steelblue",
     #                      mid = "white",
     #                      high = "firebrick", space = "Lab") 
   scale_fill_viridis_c(option = "inferno")
 )
+
+# saveRDS(rec_surface, "figures/rmeanstrat_mmeanO2/rec_surface.rds")
 
 ggsave(
 "figures/rmeanstrat_mmeanO2/rec_Tadjust_bivariate_sbt_strat4.png", 
@@ -170,13 +172,15 @@ mort.mat.df <- mort_pred %>%
     labs(x = "Mean bottom temperature (C)", 
          y = "Oxygen concentration", 
          fill = "",
-         title = "Expected survival") + 
+         title = "Survival") + 
     # scale_fill_gradient2(midpoint = 0.5,
     #                      low = "steelblue",
     #                      mid = "white",
     #                      high = "firebrick", space = "Lab")
   scale_fill_viridis_c(option = "inferno")
 )
+
+# saveRDS(surv_surface, "figures/rmeanstrat_mmeanO2/surv_surface.rds")
 
 ggsave(
 "figures/rmeanstrat_mmeanO2/mort_Tadjust_bivariate_sbt_O2d.png", 
@@ -311,8 +315,75 @@ ggsave("figures/rmeanstrat_mmeanO2/scallop_predicted_rmeanstrat_mmeanO2d.png",
 # then make 2 rows of 3 graphs 
 # ("rec", "mort", "growth rate map")
 # ("col", "ext", "col-ext")
-abund <- apply(rm$dens_p_y_hat80, c(2,3), mean)
-# do a for loop to make a matrix of lambdas
+abund1 <- apply(rm$dens_p_y_hat80, c(2,3), mean) %>%
+  as.data.frame() %>%
+  mutate(grid = patches,
+         lat = as.numeric(substr(grid, 1,4)),
+         lon = as.numeric(substr(grid, 5,9)),
+         grid_lat = lat,
+         grid_lon = lon,
+         per1 = V1+V2+V3+V4+V5+V6+V7+V8+
+           V9+V10+V11+V12+V13+V14+V15+V16,
+         per2 = V17+V18+V19+V20+V21+V22+V23+V24+
+           V25+V26+V27+V28+V29+V30+V31+V32)
+
+for_zscores <- c(abund1$per1, abund1$per2)
+
+abund <- abund1 %>%
+  select(grid, lat, lon, per1, per2, grid_lat, grid_lon) %>%
+  mutate(Years_1983_1998 = wiqid::standardize2match(per1, 
+                         for_zscores),
+         Years_1999_2014 = wiqid::standardize2match(per2, 
+                         for_zscores),
+         change = Years_1999_2014 - Years_1983_1998,
+         Years_1983_1998.2 = per1/meanpatcharea,
+         Years_1999_2014.2 = per2/meanpatcharea,
+         change.2 = Years_1999_2014.2 - Years_1983_1998.2) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326)
+rm(abund1)
+
+(mod_change <- ggplot() +
+  geom_point(aes(x = lon, y = lat, fill = change.2,
+                 size = Years_1999_2014.2), 
+            # alpha = 1,
+            data = abund,
+            shape = 21,
+            color = "black") +
+  geom_point(aes(x = lon, y = lat,
+                 size = Years_1983_1998.2), 
+            # alpha = 1,
+            data = abund,
+            shape = 1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  viridis::scale_color_viridis(option = "inferno") +
+  labs(x = "", y = "", fill = "Absolute\nchange",
+       size = "Mean density\n1983-1998 &\n1999-2014",
+       title = "Integrated model")+ 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) + 
+    guides(size = guide_legend(order = 1)) +
+  scale_size_continuous(breaks = c(0,100,200),
+                        limits = c(0,250))
+)
+
+saveRDS(mod_change, "figures/rmeanstrat_mmeanO2/mod_change.rds")
+
+ggsave("figures/final_figs/scallop_change_in_modeled_catch.png",
+        height = 5, width = 5, dpi = 400)
+
+ggsave("figures/rmeanstrat_mmeanO2/scallop_change_in_modeled_catch.png",
+        height = 5, width = 5, dpi = 400)
 
 ####
 ## Time series of abund, mean survival & mean rec across patches

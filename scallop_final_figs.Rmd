@@ -1,0 +1,238 @@
+#load packages
+```{r}
+library(patchwork)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(sf)
+library(rnaturalearth)
+library(here)
+is.odd <- function(x) x %% 2 != 0
+```
+# DRM and DynOcc covariate effects together (4 panels)
+```{r}
+
+# load plots created in DRM_covariate_effects_vis.Rmd
+rec_surface <- 
+  readRDS("figures/rmeanstrat_mmeanO2/rec_surface.rds") +
+  labs(title = "Integrated model",
+       fill = "Recruitment\n(z-scores)")
+
+surv_surface <- 
+  readRDS("figures/rmeanstrat_mmeanO2/surv_surface.rds") +
+  labs(title = "Integrated model",
+       fill = "Survival\n(%)")
+
+# load plots created in scallop_dyn_occ_half.Rmd
+persist_surface <- 
+  readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/persist_surface.rds") +
+  labs(title = "Occupancy model",
+       fill = "Persistence\n(%)")
+
+colonize_surface <- 
+  readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/colonize_surface.rds") +
+  labs(title = "Occupancy model",
+       fill = "Colonization\n(%)")
+
+rec_surface + colonize_surface + 
+  surv_surface + 
+  persist_surface +
+  plot_layout(ncol = 2, widths = 5, heights = 5)
+ggsave("figures/final_figs/A_2models_cov_plot2.png",
+        height = 6, width = 8, dpi = 400)
+```
+# 3 maps: observed abund. change, model abund. change, colext
+
+# Plot CHANGE in average catch by time period (0.5 grid cell)
+"Because of these measures, the abundance of sea scallops
+recovered rapidly and was fully rebuilt by 2001 (Hart &
+Rago, 2006)." Zang 2022
+```{r}
+####
+## read in Colonization - Extinction map 
+####    # created in scallop_dyn_occ_half.Rmd
+
+colext <- 
+  readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/colext.rds")
+
+colext_map <- 
+  readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/colext_map.rds") +
+  labs(title = "Occupancy model",
+       fill = "Colonization\nminus\nextinction")
+
+####
+## create change map (observed data)
+####
+
+# read in trawl data, filter to just scallops (sent by Fred K)
+dat2 <- readRDS("data_noaa/trawl/dat.rds") %>%
+  filter(grepl(sppocean, pattern = "placopecten"))
+
+# read in haul data (sent by Fred K)
+# subset hauls to only include NEFSC_NEUS which has length
+hauls_df_step1 <- readRDS("data_noaa/trawl/hauls.rds") %>%
+  filter(region %in% c("NEFSC_NEUS")) %>%
+  # fill all haul data with scallop wtcpue
+  left_join(dat2, by = "haulid") %>%
+  select(-sppocean, -Freq, -presfit, -logwtcpue) %>%
+  replace_na(list(wtcpue = 0)) %>%
+  filter(year >= 1983) %>%
+  mutate(decade = case_when(year>=1983 & year < 1999 ~ "per1",
+                            year>=1999 & year < 2015 ~ "per2"),
+         grid_lat = case_when(lat-trunc(lat)<0.5 ~ trunc(lat)+0.25,
+                              lat-trunc(lat)>=0.5 ~ 
+                                trunc(lat)+0.75),
+         grid_lon = case_when(abs(lon-trunc(lon))<0.5 ~ 
+                                trunc(lon)-0.25,
+                              abs(lon-trunc(lon))>=0.5 ~ 
+                                trunc(lon)-0.75),
+         grid = paste0(grid_lat,grid_lon)) %>%
+  arrange(haulid, year)
+
+# Read in NEUS survey length data from OceanAdapt 
+# originally obtained from Alexa F as "neus_Survdat.RData"
+tlen <- readRDS("data_noaa/trawl/survdat.rds") %>%
+  # filter to just scallops (401)
+  filter(SVSPP == 401) %>%
+  # divide into length bins (measures coarser than dredge survey)
+  mutate(
+    n_0_80 = ifelse(LENGTH < 8, NUMLEN, 0),
+    n_80_up = ifelse(LENGTH >= 8, NUMLEN, 0),
+    station_temp = case_when(nchar(STATION)==1 ~ 
+                               paste0("00", as.character(STATION)),
+                             nchar(STATION)==2 ~
+                               paste0("0", as.character(STATION)),
+                             nchar(STATION)==3 ~
+                               as.character(STATION),
+                             TRUE ~ "problem"),
+    haulid = paste(CRUISE6,station_temp,STRATUM, sep = "-")) %>%
+  select(-station_temp)
+
+# include total catch number from tlen in hauls_df
+hauls_df <- tlen %>%
+  group_by(haulid) %>%
+  summarize(n_catch_all = sum(NUMLEN, na.rm = T), # 23 NA, 1963: 17
+            n_0_80 = sum(n_0_80),
+            n_80_up = sum(n_80_up), 
+            .groups = "drop") %>%
+  right_join(hauls_df_step1, by = "haulid") %>%
+  replace_na(replace = list(n_catch_all = 0,
+                            n_0_80 = 0,
+                            n_80_up = 0)) %>%
+  arrange(haulid, year)
+# note: haulid "201404-211-1100" has EXTREMELY high count (>150k)
+
+hauls_drm <- read.csv("processed-data/scallop_catch_at_length_mo.csv")
+
+# rm(hauls_df_step1)
+
+# summarizing hauls data by 0.5 degree grid cell
+hd_df = hauls_df %>%
+    mutate(lat = grid_lat,
+         lon = grid_lon) %>%
+    group_by(grid, year, decade, lat, lon, 
+           grid_lat, grid_lon) %>%
+  summarize(mean_wtcpue = mean(wtcpue),
+            mean_tot_num = mean(n_catch_all),
+            mean_0_80 = mean(n_0_80),
+            mean_80_up = mean(n_80_up),
+            n_hauls = length(wtcpue),
+            mean_depth = mean(elev, na.rm = T),
+            mean_bottemp = mean(bottemp, na.rm = T),
+            .groups = "drop") %>%
+  arrange(grid, year) %>%
+  filter(lat >34)
+
+# make data frames into sf objects and load spatial data
+hauls <- hauls_df %>%
+  st_as_sf(coords = c("lon", "lat"),
+           crs = 4326)
+
+hd <- hd_df %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326) %>%
+  st_crop(colext)
+
+state_bounds <- 
+  rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  st_crop(hd)
+
+rm(hauls_df, dat2)
+
+# summarize change in mean catch between 1980-1999 and 2000-2015
+change_plot <- hd %>%
+  st_drop_geometry() %>%
+  as.data.frame() %>%
+  filter(year >= 1983) %>%
+  mutate(decade = case_when(decade == "per1" ~ 
+                              "Years_1983_1998",
+                            TRUE ~ "Years_1999_2014")) %>%
+  group_by(grid, lat, lon, decade) %>%
+  summarize(#mean_catch = mean(mean_wtcpue, na.rm = T),
+            mean_catch = mean(mean_80_up, na.rm = T),
+            .groups = "drop") %>%
+  pivot_wider(id_cols = c(grid, lat, lon), names_from = decade,
+              values_from = "mean_catch") %>%
+  mutate(
+    pct_change = 
+           (100*(Years_1999_2014 - Years_1983_1998))/Years_1983_1998,
+    change = Years_1999_2014 - Years_1983_1998,
+    grid_lat = lat, grid_lon = lon
+    ) %>%
+  st_as_sf(coords = c("grid_lon", "grid_lat"),
+           crs = 4326) 
+
+(obs_change <- ggplot() +
+  geom_point(aes(x = lon, y = lat, fill = change,
+                 size = Years_1999_2014), 
+            # alpha = 1,
+            data = change_plot,
+            shape = 21,
+            color = "black") +
+  geom_point(aes(x = lon, y = lat,
+                 size = Years_1983_1998), 
+            # alpha = 1,
+            data = change_plot,
+            shape = 1,
+            color = "black") +
+  geom_sf(data = state_bounds, aes(), color = "gray",
+          size = .25) +  theme_bw() +
+  theme(text = element_text(size = 15),
+        axis.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8)) +
+  labs(x = "", y = "", fill = "Absolute\nchange",
+       size = "Mean catch\n1983-1998 &\n1999-2014",
+       title = "Observed abundance")+ 
+  scale_fill_gradient2(midpoint = 0, 
+                       low = "steelblue", 
+                       mid = "white",
+                       high = "firebrick", space = "Lab") +
+  theme(text = element_text(size = 14),
+        title = element_text(size = 12)) + 
+    guides(size = guide_legend(order = 1))
+)
+
+ggsave("figures/final_figs/scallop_trawl_change_in_mean_catch.png",
+        height = 5, width = 5, dpi = 400)
+
+####
+## load change map (modeled density)
+##    created in DRM_covariate_effects_vis.Rmd
+####
+
+mod_change <- readRDS("figures/rmeanstrat_mmeanO2/mod_change.rds")
+
+mod_change
+
+####
+## create 3-panel figure of maps
+####
+
+obs_change + mod_change + colext_map + 
+  plot_layout(ncol = 3, heights = 5, widths = 5)
+
+ggsave("figures/final_figs/obs_pred_maps.png",
+       height = 4, width = 12, dpi = 400)
+
+```
