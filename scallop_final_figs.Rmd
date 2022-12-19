@@ -14,12 +14,12 @@ is.odd <- function(x) x %% 2 != 0
 
 # load plots created in DRM_covariate_effects_vis.Rmd
 rec_surface <- 
-  readRDS("figures/rmeanstrat_mmeanO2/rec_surface.rds") +
+  readRDS("figures/rmeanstrat_mmeanO2_h/rec_surface.rds") +
   labs(title = "Integrated model",
        fill = "Recruitment\n(z-scores)")
 
 surv_surface <- 
-  readRDS("figures/rmeanstrat_mmeanO2/surv_surface.rds") +
+  readRDS("figures/rmeanstrat_mmeanO2_h/surv_surface.rds") +
   labs(title = "Integrated model",
        fill = "Survival\n(%)")
 
@@ -38,7 +38,7 @@ rec_surface + colonize_surface +
   surv_surface + 
   persist_surface +
   plot_layout(ncol = 2, widths = 5, heights = 5)
-ggsave("figures/final_figs/A_2models_cov_plot2.png",
+ggsave("figures/final_figs/A_2models_cov_plot2_h.png",
         height = 6, width = 8, dpi = 400)
 ```
 # 3 maps: observed abund. change, model abund. change, colext
@@ -182,15 +182,25 @@ change_plot <- hd %>%
   st_as_sf(coords = c("grid_lon", "grid_lat"),
            crs = 4326) 
 
+obsstd <- c(change_plot$Years_1983_1998, 
+                               change_plot$Years_1999_2014)
+
+change_plot <- change_plot %>%
+  mutate(Years_1999_2014S = wiqid::standardize2match(Years_1999_2014,
+                                                     obsstd),
+         Years_1983_1998S = wiqid::standardize2match(Years_1983_1998,
+                                                    obsstd),
+         changeS = Years_1999_2014S-Years_1983_1998S)
+
 (obs_change <- ggplot() +
-  geom_point(aes(x = lon, y = lat, fill = change,
-                 size = Years_1999_2014), 
+  geom_point(aes(x = lon, y = lat, fill = changeS,
+                 size = Years_1999_2014S), 
             # alpha = 1,
             data = change_plot,
             shape = 21,
             color = "black") +
   geom_point(aes(x = lon, y = lat,
-                 size = Years_1983_1998), 
+                 size = Years_1983_1998S), 
             # alpha = 1,
             data = change_plot,
             shape = 1,
@@ -213,7 +223,7 @@ change_plot <- hd %>%
     guides(size = guide_legend(order = 1))
 )
 
-ggsave("figures/final_figs/scallop_trawl_change_in_mean_catch.png",
+ggsave("figures/final_figs/scallop_trawl_change_in_mean_catch_h_z.png",
         height = 5, width = 5, dpi = 400)
 
 ####
@@ -221,7 +231,7 @@ ggsave("figures/final_figs/scallop_trawl_change_in_mean_catch.png",
 ##    created in DRM_covariate_effects_vis.Rmd
 ####
 
-mod_change <- readRDS("figures/rmeanstrat_mmeanO2/mod_change.rds")
+mod_change <- readRDS("figures/rmeanstrat_mmeanO2_h/mod_change.rds")
 
 mod_change
 
@@ -232,7 +242,7 @@ mod_change
 obs_change + mod_change + colext_map + 
   plot_layout(ncol = 3, heights = 5, widths = 5)
 
-ggsave("figures/final_figs/obs_pred_maps.png",
+ggsave("figures/final_figs/obs_pred_maps_h_z.png",
        height = 4, width = 12, dpi = 400)
 
 ```

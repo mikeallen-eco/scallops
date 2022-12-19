@@ -16,18 +16,105 @@ library(tidyr)
 library(sf)
 
 # load posteriors for mean SBTemp vs. recruitment
-rmmeanO2 <- readRDS("results/stan_model_posts_run20221116c.rds")
-rmean <- readRDS("results/stan_model_posts_run20221012a.rds")
+null_h <- readRDS("D:/scallop/stan_model_posts_run20221216a.rds")
+rminstrat_mmaxO2 <- 
+  readRDS("D:/scallop/stan_model_posts_run20221214a.rds")
+rmeanstrat_mmeanO2 <- 
+  readRDS("D:/scallop/stan_model_posts_run20221201a.rds")
+
+# rmmeanO2 <- readRDS("results/stan_model_posts_run20221116c.rds")
+# rmean <- readRDS("results/stan_model_posts_run20221012a.rds")
 # rmean_len <- readRDS("results/stan_model_posts_run20221031a.rds")
 # rmean_both <- readRDS("results/stan_model_posts_run20221110a.rds")
 # rmeanL1 <- readRDS("results/stan_model_posts_run20221103a.rds")
-mmean <- readRDS("results/stan_model_posts_run20221018a.rds") 
-rmax <- readRDS("results/stan_model_posts_run20221019a.rds")
-mmax <- readRDS("results/stan_model_posts_run20221019b.rds") 
-rmin <- readRDS("results/stan_model_posts_run20221019c.rds") 
-mmin <- readRDS("results/stan_model_posts_run20221019d.rds") 
-null <- readRDS("results/stan_model_posts_run20221024a.rds") 
+# mmean <- readRDS("results/stan_model_posts_run20221018a.rds") 
+# rmax <- readRDS("results/stan_model_posts_run20221019a.rds")
+# mmax <- readRDS("results/stan_model_posts_run20221019b.rds") 
+# rmin <- readRDS("results/stan_model_posts_run20221019c.rds") 
+# mmin <- readRDS("results/stan_model_posts_run20221019d.rds") 
+# null <- readRDS("results/stan_model_posts_run20221024a.rds") 
 ```
+# null_h model: no covariates on rec or surv; half degree res
+```{r}
+# visualize observed vs. predicted projections of 80mm+ scallops
+mod <- null_h 
+mod <- rminstrat_mmaxO2
+mod <- rmeanstrat_mmeanO2
+
+pred80 <- cbind(apply(mod$dens_p_y_hat80, 
+                               c(2,3), median)) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(year = 1983:2014) %>%
+  pivot_longer(cols = V1:V116) %>%
+  mutate(patch = as.numeric(substr(name, 2,4))) %>%
+  arrange(patch, year) %>%
+  select(year, patch, est80 = value) %>%
+  mutate(est80 = est80)
+
+obs80 <- dat_train_dens80 %>%
+  arrange(patch, year) %>%
+  mutate(year = year + 1982,
+         obs80 = mean_dens * meanpatcharea)
+
+obspred <- obs80 %>%
+  full_join(pred80, by = c("year", "patch")) %>%
+  arrange(patch, year)
+
+# calculate spearmans correlation
+obspred_cor <- obspred %>% filter(is.na(obs80)==F)
+cor(obspred_cor$obs80, 
+    obspred_cor$est80, 
+    method = "spearman") 
+# 0.162 for null (half degree)
+# 0.581 for min/max model
+# 0.512 for mean/mean model
+
+
+# plot observed vs. predicted
+obspred %>%
+  # filter(obs80 > 0) %>%
+  filter(is.na(obs80)==F) %>%
+  ggplot(aes(x = wiqid::standardize(log10((obs80/meanpatcharea)+1)), 
+             y = wiqid::standardize(log10((est80/meanpatcharea)+1)),
+             color = year)) +
+  geom_point(size = 4,
+             alpha = .4) +
+  geom_smooth(method = "lm", se = F,
+              color = "black") +
+  # annotate("text", x = 500, y = 6, label = "Spearmans =\n0.162") +
+  labs(x = "Obs. 80mm+ scallops / trawl",
+       y = "Pred. 80mm+ scallops / trawl",
+       color = "Year") +
+  # ggtitle("Model name") +
+  # scale_y_log10(limits = c(1,1000),
+  #               breaks = c(1,10,100,1000)) +
+  # scale_y_log10() +
+  # scale_x_log10() +
+  scale_color_continuous(breaks = seq(1983,2013,length.out = 4)) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) 
+
+ggsave("writing/v0/obspred_rmeanstrat_mmeanO2.png",
+    height = 4, width = 6, dpi = 400)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # rmmeanO2 model: Rec & Survival vs. Mean SBT & O2 - change in 10 year mean pop. est, observed; also suitability
 ```{r}
 # Tdep rec vs. mean sbt
