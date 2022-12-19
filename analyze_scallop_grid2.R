@@ -749,7 +749,7 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221214a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221216a.rds"))
 # stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221214a.rds"))
 
 warmups <- 2000 # was 1000 during testing
@@ -857,8 +857,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221214a.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221214a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221216a.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221201a.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -896,13 +896,14 @@ Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
 width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort,
 surv = rstan::extract(stan_model_fit, "surv")$surv,
 raw = rstan::extract(stan_model_fit, "raw")$raw,
+mean_recruits = rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits,
 sigma_r = rstan::extract(stan_model_fit, "sigma_r")$sigma_r,
 dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80
 # proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221201a.rds")
+saveRDS(post, "results/stan_model_posts_run20221216a.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
