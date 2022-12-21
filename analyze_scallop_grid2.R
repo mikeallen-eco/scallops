@@ -71,7 +71,7 @@ spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
 btemp_meas_rec <- "min" # "min", "mean", "max", or "O2"
-btemp_meas_mort <- "max" # "min", "mean", "max", or "O2"
+btemp_meas_mort <- "min" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
@@ -220,14 +220,14 @@ if(btemp_meas_rec == "min" & btemp_meas_mort == "max"){
 
 if(btemp_meas_rec == "min" & btemp_meas_mort == "min"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2, 
+    select(grid, year, O2, strat,
            climvar_rec = min_temp,
            climvar_mort = min_temp)
 }
 
 if(btemp_meas_rec == "max" & btemp_meas_mort == "max"){
   clim_avg <- clim_avg %>%
-    select(grid, year, O2, 
+    select(grid, year, O2, strat,
            climvar_rec = max_temp,
            climvar_mort = max_temp)
 }
@@ -749,8 +749,8 @@ stan_data <- list(
   spawner_recruit_relationship = spawner_recruit_relationship, 
   run_forecast=run_forecast
 )
-saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221216a.rds"))
-# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221214a.rds"))
+saveRDS(stan_data, here("processed-data", "scallop_stan_data_20221221a.rds"))
+# stan_data <- readRDS(here("processed-data", "scallop_stan_data_20221221a.rds"))
 
 warmups <- 2000 # was 1000 during testing
 total_iterations <- 3200 # warmup + 1000 has been working ok
@@ -857,8 +857,8 @@ stan_model_fit <- stan(file = here::here("src","process_sdm_based_on_20221003_1m
                                       adapt_delta = .9)
 )
 
-saveRDS(stan_model_fit, here("results","stan_model_fit_run20221216a.rds"))
-# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221201a.rds"))
+saveRDS(stan_model_fit, here("results","stan_model_fit_run20221221a.rds"))
+# stan_model_fit <- readRDS(here("results","stan_model_fit_run20221221a.rds"))
 
 # assess how many divergent transitions in each chain
 # check_rhat(stan_model_fit)
@@ -884,26 +884,26 @@ post <- list(
 # T_adjust_mort_proj = rstan::extract(stan_model_fit, "T_adjust_mort_proj")$T_adjust_mort_proj,
 # Tbeta0 = rstan::extract(stan_model_fit, "Tbeta0")$Tbeta0,
 # Tbeta = rstan::extract(stan_model_fit, "Tbeta")$Tbeta,
-linbeta0rec = rstan::extract(stan_model_fit, "linbeta0rec")$linbeta0rec,
+linbeta0rec = rstan::extract(stan_model_fit, "linbeta0rec", permuted = F),
 # O2betarec = rstan::extract(stan_model_fit, "O2betarec")$O2betarec,
-stratbetarec = rstan::extract(stan_model_fit, "stratbetarec")$stratbetarec,
-linbeta0mort = rstan::extract(stan_model_fit, "linbeta0mort")$linbeta0mort,
-O2betamort = rstan::extract(stan_model_fit, "O2betamort")$O2betamort,
+stratbetarec = rstan::extract(stan_model_fit, "stratbetarec", permuted = F),
+linbeta0mort = rstan::extract(stan_model_fit, "linbeta0mort", permuted = F),
+O2betamort = rstan::extract(stan_model_fit, "O2betamort", permuted = F),
 # stratbetamort = rstan::extract(stan_model_fit, "stratbetamort")$stratbetamort,
-Topt_rec = rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec,
-width_rec = rstan::extract(stan_model_fit, "width_rec")$width_rec,
-Topt_mort = rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort,
-width_mort = rstan::extract(stan_model_fit, "width_mort")$width_mort,
-surv = rstan::extract(stan_model_fit, "surv")$surv,
-raw = rstan::extract(stan_model_fit, "raw")$raw,
-mean_recruits = rstan::extract(stan_model_fit, "mean_recruits")$mean_recruits,
-sigma_r = rstan::extract(stan_model_fit, "sigma_r")$sigma_r,
-dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80")$dens_p_y_hat80
+Topt_rec = rstan::extract(stan_model_fit, "Topt_rec", permuted = F),
+width_rec = rstan::extract(stan_model_fit, "width_rec", permuted = F),
+Topt_mort = rstan::extract(stan_model_fit, "Topt_mort", permuted = F),
+width_mort = rstan::extract(stan_model_fit, "width_mort", permuted = F),
+surv = rstan::extract(stan_model_fit, "surv", permuted = F),
+raw = rstan::extract(stan_model_fit, "raw", permuted = F),
+mean_recruits = rstan::extract(stan_model_fit, "mean_recruits", permuted = F),
+sigma_r = rstan::extract(stan_model_fit, "sigma_r", permuted = F),
+dens_p_y_hat80 = rstan::extract(stan_model_fit, "dens_p_y_hat80", permuted = F)
 # proj_dens_p_y_hat80 = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80")$proj_dens_p_y_hat80
 # dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "dens_p_y_hat80_lambda")$dens_p_y_hat80_lambda,
 # proj_dens_p_y_hat80_lambda = rstan::extract(stan_model_fit, "proj_dens_p_y_hat80_lambda")$proj_dens_p_y_hat80_lambda
 )
-saveRDS(post, "results/stan_model_posts_run20221216a.rds")
+saveRDS(post, "results/stan_model_posts_run20221221a_np.rds")
 
 quantile(rstan::extract(stan_model_fit, "Topt_rec")$Topt_rec, c(0.025, 0.5, 0.975))
 quantile(rstan::extract(stan_model_fit, "Topt_mort")$Topt_mort, c(0.025, 0.5, 0.975))
@@ -1027,13 +1027,13 @@ hist(extract(stan_model_fit, "mean_recruits")$mean_recruits)
 
 abund_p_y <- dat_train_dens %>%
   mutate(abundance = mean_dens * meanpatcharea) %>%
-  mutate(grid_lat = substr(grid, 1, 4),
-         grid_lon = as.numeric(substr(grid, 5, 9))) # note: this is set up for 1x1 grid currently
+  mutate(grid_lat = substr(grid, 1, 5),
+         grid_lon = as.numeric(substr(grid, 6, 11))) # note: this is set up for 0.5x0.5 grid currently
 
 abund_p_y80 <- dat_train_dens80 %>%
   mutate(abundance = mean_dens * meanpatcharea) %>%
-  mutate(grid_lat = substr(grid, 1, 4),
-         grid_lon = as.numeric(substr(grid, 5, 9))) # note: this is set up for 1x1 grid currently
+  mutate(grid_lat = substr(grid, 1, 5),
+         grid_lon = as.numeric(substr(grid, 6, 11))) # note: this is set up for 0.5x0.5 grid currently
   
 # grab subset of cells from MA_9 group
 # unique(abund_p_y$patch[abund_p_y$grid %in% MA_9$grid]) # c(25, 26, 30, 31, 32, 43, 44, 45)
@@ -1042,7 +1042,7 @@ abund_p_y_hat <- tidybayes::spread_draws(stan_model_fit, dens_p_y_hat[patch,year
   left_join(distinct(select(abund_p_y, grid, patch)))
 
 abund_p_y_hat80 <- tidybayes::spread_draws(stan_model_fit, dens_p_y_hat80[patch,year]) %>%
-  left_join(distinct(select(abund_p_y, grid, patch)))
+  left_join(distinct(select(abund_p_y80, grid, patch)))
 
 ### Plot log mean abundance (all sizes) vs. time (observed and predicted)
 i = 18
@@ -1221,7 +1221,8 @@ abund_obs_pred80 <- abund_p_y_hat80 %>%
             .groups = "drop") %>%
   left_join(abund_p_y80, by = c("grid", "year"))
 corr <- cor.test(x=abund_obs_pred80$abundance, y=abund_obs_pred80$dens_p_y_hat80, method = 'spearman')
-
+plot(x=log(abund_obs_pred80$abundance/meanpatcharea+1), y=log(abund_obs_pred80$dens_p_y_hat80/meanpatcharea+1))
+        
 abund_obs_pred80 %>%
   ggplot() +
   geom_point(aes(x = abundance, y = dens_p_y_hat80),
