@@ -967,8 +967,49 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
 saveRDS(psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat.rds")
 ```
+# SMALLER MODELS W/ JUST 1 LINEAR COVARIATE EACH
+# Bundle data for JAGS & run models (mean SBT only)
+# Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
 
-# Bonanza model (90th percentile hauls): 
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
+
+jdata_L0minmax <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0minmax)
+
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", 
+            "betapsistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "psiInt", "phiInt", "gamInt", "p")
+
+# psi.meansbt.o2.strat.phi.maxsbt.o2.gam.minsbt.strat
+( psi.meansbt.o2.strat.phi.maxsbt.o2.gam.minsbt.strat <- 
+    jagsUI::jags(jdata_L0minmax, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.maxsbt.o2.gam.minsbt.strat,
+        "D:/scallop/dynocc_output/psi.meansbt.strat.o2.phi.maxsbt.o2.gam.minsbt.strat.rds")
+```
+# Bonanza model (90th or 95th percentile hauls): 
 # Bundle data for JAGS & run models (mean SBT only)
 # Mean, mean, mean SBT hypothesis
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
