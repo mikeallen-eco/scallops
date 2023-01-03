@@ -217,7 +217,11 @@ change_plot <- change_plot %>%
   scale_fill_gradient2(midpoint = 0, 
                        low = "steelblue", 
                        mid = "white",
-                       high = "firebrick", space = "Lab") +
+                       high = "firebrick", space = "Lab",
+                       limits = c(-1,6.65),
+                       breaks = c(0,2,4,6)) +
+  scale_size_continuous(breaks = c(0,2,4,6),
+                      limits = c(-.5,7.76)) +
   theme(text = element_text(size = 14),
         title = element_text(size = 12)) + 
     guides(size = guide_legend(order = 1))
@@ -231,7 +235,8 @@ ggsave("figures/final_figs/scallop_trawl_change_in_mean_catch_h_z.png",
 ##    created in DRM_covariate_effects_vis.Rmd
 ####
 
-mod_change <- readRDS("figures/rmeanstrat_mmeanO2_h/mod_change.rds")
+# mod change 2 has scale to match other one; mod_change has original
+mod_change <- readRDS("figures/rmeanstrat_mmeanO2_h/mod_change2.rds")
 
 mod_change
 
@@ -242,7 +247,20 @@ mod_change
 obs_change + mod_change + colext_map + 
   plot_layout(ncol = 3, heights = 5, widths = 5)
 
-ggsave("figures/final_figs/obs_pred_maps_h_z.png",
+ggsave("figures/final_figs/B_obs_pred_maps_h_z5.png",
        height = 4, width = 12, dpi = 400)
 
 ```
+# Create time series panel plots
+```{r}
+np <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches.rds")
+pp <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_ext.rds")
+gp <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col.rds")
+
+library(patchwork)
+np/pp/gp
+ggsave("figures/final_figs/D_N_gam_phi.png",
+       height = 9, width = 4, dpi = 400)
+
+```
+

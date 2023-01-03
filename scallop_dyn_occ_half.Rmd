@@ -6,7 +6,7 @@ output: html_document
 ---
 
 # Load libraries and format data
-Note: the "dat" object in this chunk must be created using the code in analyze_scallop_grid2.R first.
+Note: the "dat" object in this chunk must be created using the code in analyze_scallop_grid2.R first. Be sure years are set to 1980-2014 in that file! (otherwise, L2 & L3 contain NA values)
 ```{r}
 library(dplyr)
 library(tidyr)
@@ -46,6 +46,9 @@ clim_other <- readRDS("data_noaa/trawl/hauls.rds") %>%
   select(-latgrid, -longrid, -yearsurv, -lat, -lon, month) %>%
   arrange(grid, year)
 
+# to find quantile of hauls
+# quantile(dat_dens80_occ[is.na(dat_dens80_occ$dens)==F & dat_dens80_occ$dens>0,]$dens, 0.80)
+
 # prep dat dens data, excluding smaller scallops (< 80 mm)
 # note: "dat" here must be created in analyze_scallop_grid2.R first
 dat_dens80_occ <- dat %>% 
@@ -56,7 +59,8 @@ dat_dens80_occ <- dat %>%
   arrange(patch, grid, year, haulid) %>%
   group_by(grid, patch, year) %>%
   summarise(pres = sum(dens>0, na.rm = T),
-            presb = sum(dens>27, na.rm = T), # 28 is top 5% of hauls
+            presb = sum(dens>=47, na.rm = T), 
+            # 47 is top 20% of non-zero hauls
             n = sum(haulid!="temp", na.rm = T),
             .groups = "drop") %>%
   mutate(pres = as.numeric(ifelse(n==0, NA, pres)),
@@ -408,76 +412,6 @@ dat_train_dens80_occ %>%
 ggsave("figures/dynocc/scal_pres_v_temp_O2_strat.png", 
        height = 4, width = 6, dpi = 400)
 ```
-# Define the model (psi.sbt.o2.strat, phi.sbt.o2.strat, gam.sbt.o2.strat)
-```{r}
-
-cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt + betapsiO2*O2a[i,1] + betapsistrat*strat[i,1]
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2b[i,t-1] +
-                        betaphistrat*strat[i,t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1] + betagamO2*O2c[i,t-1] +
-                        betagamstrat*strat[i,t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
-    }
-    
-    
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  Topt1 ~ dnorm(8,16)
-  width1 ~ dnorm(5,10)
-  Topt2 ~ dnorm(8,16)
-  width2 ~ dnorm(5,10)
-  Topt3 ~ dnorm(8,16)
-  width3 ~ dnorm(5,10)
-  betapsiO2 ~ dnorm(0,5)
-  betaphiO2 ~ dnorm(0,5)
-  betagamO2 ~ dnorm(0,5)
-  betapsistrat ~ dnorm(0,5)
-  betaphistrat ~ dnorm(0,5)
-  betagamstrat ~ dnorm(0,5)
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-  
-  # log.lik.cum[i] <- sum(log.lik[i,])
-  
-}
-")
-```
 # Define the model (psi.sbt.o2.strat, phi.sbt.o2, gam.sbt.strat)
 ```{r}
 
@@ -547,259 +481,7 @@ model{
 }
 ")
 ```
-# Define the model (psi.sbt.o2, phi.sbt.o2, gam.sbt.o2)
-```{r}
-
-cat(file = "scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt", 
-    "
-model{
-  for(i in 1:nSites) {
-    # biological process
-    lpsi1[i] <- lpsiInt + betapsiO2*O2a[i,1]
-    psi1[i] <- ilogit(lpsi1[i])*exp(-0.5*((climvar1[i,1]-Topt1)/width1)^2)
-    z[i, 1] ~ dbern(psi1[i])
-    for(t in 2:nYears) {
-      lphi[i, t-1] <- lphiInt[t-1] + betaphiO2*O2b[i,t-1]
-      phi[i, t-1] <-
-        ilogit(lphi[i,t-1])*exp(-0.5*((climvar2[i,t-1]-Topt2)/width2)^2)
-      lgam[i, t-1] <- lgamInt[t-1] + 
-                        betagamO2*O2c[i,t-1]
-      gamma[i, t-1] <- 
-        ilogit(lgam[i, t-1])*exp(-0.5*((climvar3[i,t-1]-Topt3)/width3)^2)
-      z[i, t] ~ dbern(z[i, t-1]*phi[i, t-1] +
-          (1 - z[i, t-1])*gamma[i, t-1])
-   }
-    # detection process
-    for(t in 1:nYears) {
-      y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
-    }
-    
-    
-  }
-
-  # Priors
-  psiInt ~ dbeta(1, 1)
-  lpsiInt <- logit(psiInt)
-
-  for(t in 1:(nYears-1)) {
-    phiInt[t] ~ dbeta(1, 1)
-    lphiInt[t] <- logit(phiInt[t])
-    gamInt[t] ~ dbeta(1, 1)
-    lgamInt[t] <- logit(gamInt[t])
-  }
-
-  for(t in 1:nYears) {
-    p[t] ~ dbeta(1, 1)
-  }
-
-  Topt1 ~ dnorm(8,16)
-  width1 ~ dnorm(5,10)
-  Topt2 ~ dnorm(8,16)
-  width2 ~ dnorm(5,10)
-  Topt3 ~ dnorm(8,16)
-  width3 ~ dnorm(5,10)
-  betapsiO2 ~ dnorm(0,5)
-  betaphiO2 ~ dnorm(0,5)
-  betagamO2 ~ dnorm(0,5)
-
-  # Derived variable
-  for(t in 1:nYears) {
-    N[t] <- sum(z[,t]) # no. sites occupied for each year
-  }
-  
-  # log.lik.cum[i] <- sum(log.lik[i,])
-  
-}
-")
-```
-# Bundle data for JAGS & run models (mean SBT only)
-# model: psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
-# Mean, mean, mean SBT hypothesis
-# LAG 0 for Persistence; LAGS 0-3 for Colonization
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-o2L1_matS <- wiqid::standardize(O2L1_mat)
-o2L2_matS <- wiqid::standardize(O2L2_mat)
-o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-strat_matS <- wiqid::standardize(strat_mat)
-
-jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
-    strat = strat_matS)
-str(jdata_L0mean)
-
-jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
-    strat = strat_matS)
-str(jdataL0L1a)
-
-jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
-    strat = strat_matS)
-str(jdataL0L2a)
-
-jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
-    strat = strat_matS)
-str(jdataL0L3a)
-
-wanted <- c("Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", 
-            "betapsiO2", "betaphiO2", "betagamO2",
-            "betapsistrat", "betaphistrat", "betagamstrat",
-            "N", "gamma", "phi",
-            "psiInt", "phiInt", "gamInt", "p")
-
-# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
-( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
-    jagsUI::jags(jdata_L0mean, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
-    jagsUI::jags(jdataL0L1a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
-    jagsUI::jags(jdataL0L2a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
-    jagsUI::jags(jdataL0L3a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
-```
-
-# Bundle data for JAGS & run models
-# Mean, Max, Min SBT hypothesis
-# LAG 0 for Persistence; LAGS 0-3 for Colonization
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-o2L1_matS <- wiqid::standardize(O2L1_mat)
-o2L2_matS <- wiqid::standardize(O2L2_mat)
-o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-strat_matS <- wiqid::standardize(strat_mat)
-
-jdata <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = minsbt_mat, z = z, depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
-    strat = strat_matS)
-str(jdata)
-
-jdataL0L1 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = minsbtL1_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
-    strat = strat_matS)
-str(jdataL0L1)
-
-jdataL0L2 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = minsbtL2_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
-    strat = strat_matS)
-str(jdataL0L2)
-
-jdataL0L3 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = minsbtL3_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
-    strat = strat_matS)
-str(jdataL0L3)
-
-wanted <- c("Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", 
-            "betapsiO2", "betaphiO2", "betagamO2",
-            "betapsistrat", "betaphistrat", "betagamstrat",
-            "N", "gamma", "phi",
-            "lgamInt", "phiInt", "gamInt", "p")
-
-# lag 0 for all variables
-# psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2
-( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
-    jagsUI::jags(jdata, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-# original runs were 10000 iter + 1000 adapt (300 MB file)
-# looic runs are 1
-
-saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
-        "output/psi.meansbt.o2.strat.phi.maxsbt.o2.strat.gam.minsbt.o2.strat.rds")
-
-# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2
-( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
-    jagsUI::jags(jdataL0L1, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2,
-        "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL1.o2.strat.rds")
-
-# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2
-( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2 <- 
-    jagsUI::jags(jdataL0L2, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
-        "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL2.o2.strat.rds")
-
-# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2
-( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2 <- 
-    jagsUI::jags(jdataL0L3, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL3.o2.strat.rds")
-```
+# MODELS W/ 1 LINEAR COVARIATE EACH
 # Bundle data for JAGS & run models (mean SBT only)
 # Mean, mean, mean SBT hypothesis
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
@@ -813,122 +495,29 @@ o2_matS <- wiqid::standardize(O2_mat)
 o2L1_matS <- wiqid::standardize(O2L1_mat)
 o2L2_matS <- wiqid::standardize(O2L2_mat)
 o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
 strat_matS <- wiqid::standardize(strat_mat)
 
 jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    climvar3 = meansbt_mat, z = z,  
     O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
     strat = strat_matS)
 str(jdata_L0mean)
 
 jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    climvar3 = meansbtL1_mat, z = z,  
     O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
     strat = strat_matS)
 str(jdataL0L1a)
 
-jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
-    strat = strat_matS)
-str(jdataL0L2a)
-
-jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
-    strat = strat_matS)
-str(jdataL0L3a)
-
-wanted <- c("Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", 
-            "betapsiO2", "betaphiO2", "betagamO2",
-            "betapsistrat", "betaphistrat", "betagamstrat",
-            "N", "gamma", "phi",
-            "psiInt", "phiInt", "gamInt", "p")
-
-# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
-( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
-    jagsUI::jags(jdata_L0mean, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.strat.gam.meansbt.o2.strat.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
-    jagsUI::jags(jdataL0L1a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL1.o2.strat.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
-    jagsUI::jags(jdataL0L2a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL2.o2.strat.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
-    jagsUI::jags(jdataL0L3a, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL3.o2.strat.rds")
-```
-# SMALLER MODELS W/ JUST 1 LINEAR COVARIATE EACH
-# Bundle data for JAGS & run models (mean SBT only)
-# Mean, mean, mean SBT hypothesis
-# LAG 0 for Persistence; LAGS 0-3 for Colonization
-```{r}
-# Get known values of z
-z <- (ymat > 0)*1
-z[z == 0] <- NA
-
-# Standardize covariates
-o2_matS <- wiqid::standardize(O2_mat)
-o2L1_matS <- wiqid::standardize(O2L1_mat)
-o2L2_matS <- wiqid::standardize(O2L2_mat)
-o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
-strat_matS <- wiqid::standardize(strat_mat)
-
-jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
-    strat = strat_matS)
-str(jdata_L0mean)
-
-jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
-    strat = strat_matS)
-str(jdataL0L1a)
-
-jdata_L0meanmax <- 
+jdata_L0maxmax <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = maxsbt_mat, z = z,  depth = depth_matS,
+    n = nmat, climvar1 = maxsbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = maxsbt_mat, z = z,  
     O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
     strat = strat_matS)
-str(jdata_L0meanmax)
+str(jdata_L0maxnmax)
 
 wanted <- c("Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", 
@@ -947,7 +536,7 @@ wanted <- c("Topt1", "width1",
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
 
-# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat <- 
     jagsUI::jags(jdataL0L1a, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
@@ -957,15 +546,15 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.rds")
 
-# psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat
-( psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat <- 
-    jagsUI::jags(jdata_L0meanmax, NULL, wanted, 
+# psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
+( psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat <- 
+    jagsUI::jags(jdata_L0maxmax, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
                       n.thin = 30,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
-saveRDS(psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbt.o2.gam.meansbt.strat.rds")
+saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
+        "D:/scallop/dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat.rds")
 ```
 # SMALLER MODELS W/ JUST 1 LINEAR COVARIATE EACH
 # Bundle data for JAGS & run models (mean SBT only)
@@ -981,7 +570,6 @@ o2_matS <- wiqid::standardize(O2_mat)
 o2L1_matS <- wiqid::standardize(O2L1_mat)
 o2L2_matS <- wiqid::standardize(O2L2_mat)
 o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
 strat_matS <- wiqid::standardize(strat_mat)
 
 jdata_L0minmax <- 
@@ -1009,7 +597,7 @@ wanted <- c("Topt1", "width1",
 saveRDS(psi.meansbt.o2.strat.phi.maxsbt.o2.gam.minsbt.strat,
         "D:/scallop/dynocc_output/psi.meansbt.strat.o2.phi.maxsbt.o2.gam.minsbt.strat.rds")
 ```
-# Bonanza model (90th or 95th percentile hauls): 
+# Bonanza model (80th percentile hauls): 
 # Bundle data for JAGS & run models (mean SBT only)
 # Mean, mean, mean SBT hypothesis
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
@@ -1023,79 +611,33 @@ o2_matS <- wiqid::standardize(O2_mat)
 o2L1_matS <- wiqid::standardize(O2L1_mat)
 o2L2_matS <- wiqid::standardize(O2L2_mat)
 o2L3_matS <- wiqid::standardize(O2L3_mat)
-depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
 
 jdata_L0mean.b <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
     climvar3 = meansbt_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS)
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS, strat = strat_matS)
 str(jdata_L0mean.b)
 
-jdataL0L1a.b <- 
-  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS)
-str(jdataL0L1a.b)
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", "betagamO2",
+            "betapsistrat", "betaphistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "psiInt", "phiInt", "gamInt", "p")
 
-jdataL0L2a.b <- 
-  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
-    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS)
-str(jdataL0L2.b)
-
-jdataL0L3a.b <- 
-  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
-    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
-    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS)
-str(jdataL0L3a.b)
-
-wanted <- c("psiInt", "phiInt", "gamInt", "p", "Topt1", "width1", 
-            "Topt2", "width2", "Topt3", "width3", "N", "gamma", "phi",
-            "betapsiO2", "betaphiO2", "betagamO2")
-
-# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b
-( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b <- 
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b <- 
     jagsUI::jags(jdata_L0mean.b, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
                       n.thin = 10,
     n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.b.rds")
+saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")
 
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b <- 
-    jagsUI::jags(jdataL0L1a.b, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
 
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b_90pct.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b <- 
-    jagsUI::jags(jdataL0L2a.b, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.b.rds")
-
-# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b
-( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b <- 
-    jagsUI::jags(jdataL0L3a.b, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
-                      n.thin = 10,
-    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.b.rds")
 ```
 # Check model output
 ```{r}
@@ -1367,8 +909,23 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_phi_colextmap2.png",
 ```
 # plot predicted N over time
 ```{r}
-plot(mod$mean$N, 
-     type = "l")
+mod <- readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+
+modb <- readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")  
+
+Nest <- dat_train_dens80_occ %>%
+  group_by(year) %>%
+  summarize(n = sum(n>0),
+            gridpres = sum(pres>0, na.rm = T),
+            gridpresb = sum(presb>0, na.rm = T),
+            p = gridpres / n,
+            pb = gridpresb / n,
+            Nest = p*116,
+            Nestb = pb*116)
+
+plot(Nest$Nest, type = "l", ylim = c(0,80))
+points(Nest$Nestb, type = "l")
+points(mod$mean$N, type = "l")
 
 N.plot <- data.frame(
   year = 1983:2014,
@@ -1381,21 +938,25 @@ N.plot <- data.frame(
   q90 = apply(
     mod$sims.list$N, 2,
     function(x)quantile(x, 0.9)),
-  type = "80mm+") # %>%
-  # bind_rows(
-  #   data.frame(
-  # N = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$mean$N,
-  # year = 1983:2014,
-  # q2.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q2.5$N,
-  # q97.5 = psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$q97.5$N,
-  # q10 = apply(
-  #   psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
-  #   function(x)quantile(x, 0.1)),
-  # q90 = apply(
-  #   psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2$sims.list$N, 2,
-  #   function(x)quantile(x, 0.9)),
-  # type = "Any 80mm+")
-# )
+  type = "Any 80 mm +") %>%
+  bind_rows(
+    data.frame(
+  N = modb$mean$N,
+  year = 1983:2014,
+  q2.5 = modb$q2.5$N,
+  q97.5 = modb$q97.5$N,
+  q10 = apply(
+    modb$sims.list$N, 2,
+    function(x)quantile(x, 0.1)),
+  q90 = apply(
+    modb$sims.list$N, 2,
+    function(x)quantile(x, 0.9)),
+  type = "Abundant 80 mm +")
+) %>%
+  mutate(type = forcats::fct_reorder(type, c(rep(1,32),rep(2,32))))
+
+gamb <- apply(apply(modb$sims.list$gamma, c(1,3), mean), 2, 
+      function(x)quantile(x, c(0.5)))
 
 gam.plot <- apply(apply(mod$sims.list$gamma, c(1,3), mean), 2, 
       function(x)quantile(x, c(0.025, .1, 0.5, .9, 0.975))) %>%
@@ -1404,7 +965,11 @@ gam.plot <- apply(apply(mod$sims.list$gamma, c(1,3), mean), 2,
   rename(q2.5 = 1, q10 = 2, col = 3, 
          q90 = 4, q97.5 = 5) %>%
   mutate(year = 1983:2013,
-         type = "80mm+")
+         type = "80mm+",
+         gamb = gamb)
+
+phib <- apply(apply(1-modb$sims.list$phi, c(1,3), mean), 2, 
+      function(x)quantile(x, c(0.5)))
 
 phi.plot <- apply(apply(mod$sims.list$phi, c(1,3), mean), 2, 
       function(x)quantile(x, c(0.025, .1, 0.5, .9, 0.975))) %>%
@@ -1413,24 +978,31 @@ phi.plot <- apply(apply(mod$sims.list$phi, c(1,3), mean), 2,
   rename(q2.5 = 1, q10 = 2, phi = 3, 
          q90 = 4, q97.5 = 5) %>%
   mutate(year = 1983:2013,
-         type = "80mm+")
+         type = "80mm+",
+         phib = phib)
 
 # plot N over time
 (np <- N.plot %>%
   ggplot() +
-  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5),
+  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5,
+                  group = type),
               alpha = 0.25) +
-  geom_ribbon(aes(x = year, ymin = q10, ymax = q90),
+  geom_ribbon(aes(x = year, ymin = q10, ymax = q90,
+                  group = type),
               alpha = 0.25) +
-  geom_line(aes(x = year, y = N),
+  geom_line(aes(x = year, y = N, linetype = type),
             size = 1) +
   scale_color_manual(values = c("firebrick", "steelblue")) +
   scale_fill_manual(values = c("firebrick", "steelblue")) +
   labs(fill = "", color = "",
-       y = "No. occupied cells (out of 116)",
+       y = "No. occupied cells",
        x = "") +
-  theme_bw()
+  theme_bw() +
+    guides(linetype = "none") +
+    theme(text = element_text(size = 14))
 )
+
+saveRDS(np, "figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches.rds")
 
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches_over_time.png",
        height = 4, width = 5, dpi = 400)
@@ -1444,13 +1016,16 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches_over_time.png",
               alpha = 0.25) +
   geom_line(aes(x = year, y = col),
             size = 1) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
-  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  # geom_line(aes(x = year, y = gamb),
+  #           size = 1, linetype = 3) +
   labs(fill = "", color = "",
-       y = "Colonization rate",
+       y = "Mean colonization rate",
        x = "") +
-  theme_bw()
+  theme_bw() +
+    theme(text = element_text(size = 14))
 )
+
+saveRDS(gp, "figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col.rds")
 
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col_over_time.png",
        height = 4, width = 5, dpi = 400)
@@ -1464,13 +1039,16 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col_over_time.png",
               alpha = 0.25) +
   geom_line(aes(x = year, y = 1-phi),
             size = 1) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
-  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  # geom_line(aes(x = year, y = phib),
+            # size = 1, linetype = 3) +
   labs(fill = "", color = "",
-       y = "Extinction rate",
+       y = "Mean extinction rate",
        x = "") +
-  theme_bw()
+  theme_bw() +
+    theme(text = element_text(size = 14))
 )
+
+saveRDS(pp, "figures/rmeanstrat_mmeanO2_h_dynocc/Mean_ext.rds")
 
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_ext_over_time.png",
        height = 4, width = 5, dpi = 400)
@@ -2120,4 +1698,309 @@ colext.mat.df %>%
 ggsave("figures/dynocc/colext_bivariate_sbt_o2.png", 
        height = 4, width = 6,
        dpi = 400)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Bundle data for JAGS & run models (mean SBT only)
+# model: psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
+# Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
+
+jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0mean)
+
+jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
+    strat = strat_matS)
+str(jdataL0L1a)
+
+jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
+    strat = strat_matS)
+str(jdataL0L2a)
+
+jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
+    strat = strat_matS)
+str(jdataL0L3a)
+
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", "betagamO2",
+            "betapsistrat", "betaphistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "psiInt", "phiInt", "gamInt", "p")
+
+# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
+( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
+    jagsUI::jags(jdata_L0mean, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
+    jagsUI::jags(jdataL0L1a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
+    jagsUI::jags(jdataL0L2a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
+    jagsUI::jags(jdataL0L3a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.phi.sbt.o2.gam.sbt.o2.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2.rds")
+```
+# Bundle data for JAGS & run models
+# Mean, Max, Min SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
+
+jdata <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbt_mat, z = z, depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata)
+
+jdataL0L1 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
+    strat = strat_matS)
+str(jdataL0L1)
+
+jdataL0L2 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
+    strat = strat_matS)
+str(jdataL0L2)
+
+jdataL0L3 <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = minsbtL3_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
+    strat = strat_matS)
+str(jdataL0L3)
+
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", "betagamO2",
+            "betapsistrat", "betaphistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "lgamInt", "phiInt", "gamInt", "p")
+
+# lag 0 for all variables
+# psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2
+( psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2 <- 
+    jagsUI::jags(jdata, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+# original runs were 10000 iter + 1000 adapt (300 MB file)
+# looic runs are 1
+
+saveRDS(psi.meansbt.o2.phi.maxsbt.o2.gam.minsbt.o2,
+        "output/psi.meansbt.o2.strat.phi.maxsbt.o2.strat.gam.minsbt.o2.strat.rds")
+
+# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2
+( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2 <- 
+    jagsUI::jags(jdataL0L1, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL1.o2,
+        "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL1.o2.strat.rds")
+
+# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2
+( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2 <- 
+    jagsUI::jags(jdataL0L2, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL2.o2,
+        "output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL2.o2.strat.rds")
+
+# psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2
+( psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2 <- 
+    jagsUI::jags(jdataL0L3, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.maxsbtL0.o2.gam.minsbtL3.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.maxsbtL0.o2.strat.gam.minsbtL3.o2.strat.rds")
+```
+# Bundle data for JAGS & run models (mean SBT only)
+# Mean, mean, mean SBT hypothesis
+# LAG 0 for Persistence; LAGS 0-3 for Colonization
+```{r}
+# Get known values of z
+z <- (ymat > 0)*1
+z[z == 0] <- NA
+
+# Standardize covariates
+o2_matS <- wiqid::standardize(O2_mat)
+o2L1_matS <- wiqid::standardize(O2L1_mat)
+o2L2_matS <- wiqid::standardize(O2L2_mat)
+o2L3_matS <- wiqid::standardize(O2L3_mat)
+depth_matS <- wiqid::standardize(depth_mat)
+strat_matS <- wiqid::standardize(strat_mat)
+
+jdata_L0mean <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0mean)
+
+jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L1_matS,
+    strat = strat_matS)
+str(jdataL0L1a)
+
+jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL2_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
+    strat = strat_matS)
+str(jdataL0L2a)
+
+jdataL0L3a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL3_mat, z = z,  depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L3_matS,
+    strat = strat_matS)
+str(jdataL0L3a)
+
+wanted <- c("Topt1", "width1", 
+            "Topt2", "width2", "Topt3", "width3", 
+            "betapsiO2", "betaphiO2", "betagamO2",
+            "betapsistrat", "betaphistrat", "betagamstrat",
+            "N", "gamma", "phi",
+            "psiInt", "phiInt", "gamInt", "p")
+
+# psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2
+( psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2 <- 
+    jagsUI::jags(jdata_L0mean, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbt.o2.gam.meansbt.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.strat.gam.meansbt.o2.strat.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2 <- 
+    jagsUI::jags(jdataL0L1a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL1.o2.strat.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2 <- 
+    jagsUI::jags(jdataL0L2a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL2.o2.strat.rds")
+
+# psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2
+( psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2 <- 
+    jagsUI::jags(jdataL0L3a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.strat.gam.sbt.o2.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL3.o2.strat.rds")
 ```
