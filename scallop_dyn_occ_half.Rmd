@@ -544,7 +544,7 @@ wanted <- c("Topt1", "width1",
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.phi.gam,
-        "D:/scallop/dynocc_output/psi.phi.gam.rds")
+        "D:/scallop/2022_11_12_dynocc_output/psi.phi.gam_waic.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat <- 
@@ -554,7 +554,7 @@ saveRDS(psi.phi.gam,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
+        "D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat <- 
@@ -588,8 +588,11 @@ saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
 ```
 # WAIC
 ```{r}
-mod0 <- psi.phi.gam
-mod1 <- psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+mod0 <- 
+  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.phi.gam_waic.rds")
+mod1 <- 
+  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
+
 mod2 <- psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
 
 loglik_full0 <- mod0$sims.list$log.lik
@@ -608,6 +611,7 @@ loglik1 <- do.call(cbind, loglik_wide1); dim(loglik1)
 loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
 
 waic0 <- loo::waic(loglik0); waic0
+loo0 <- loo::loo(loglik0); loo0
 waic1 <- loo::waic(loglik1); waic1
 waic2 <- loo::waic(loglik2); waic2
 
