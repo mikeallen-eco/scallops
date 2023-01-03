@@ -280,6 +280,8 @@ strat_mat[is.na(strat_mat)] <- mean(strat_mat, na.rm = T)
 ```{r}
 # correlation among mean SBT, O2, and depth
 cor(cbind(mean_temp = dat_train_dens80_occ$mean_temp,
+          min_temp = dat_train_dens80_occ$min_temp,
+          max_temp = dat_train_dens80_occ$max_temp,
           O2 = dat_train_dens80_occ$O2, 
           depth = dat_train_dens80_occ$mean_depth,
           strat = dat_train_dens80_occ$strat))
@@ -437,7 +439,7 @@ model{
     # detection process
     for(t in 1:nYears) {
       y[i, t] ~ dbin(p[t] * z[i, t], n[i, t])
-    # log.lik[i,t]  <- logdensity.bin(y[i,t],p[i,t],1) # for lppd
+    log.lik[i,t]  <- logdensity.bin(y[i,t],p[t],n[i,t]) # for lppd
     }
     
     
@@ -511,20 +513,38 @@ jdataL0L1a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     strat = strat_matS)
 str(jdataL0L1a)
 
+jdataL0L2a <- list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL2_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2L2_matS,
+    strat = strat_matS)
+str(jdataL0L2a)
+
 jdata_L0maxmax <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = maxsbt_mat, climvar2 = maxsbt_mat, 
     climvar3 = maxsbt_mat, z = z,  
     O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
     strat = strat_matS)
-str(jdata_L0maxnmax)
+str(jdata_L0maxmax)
 
 wanted <- c("Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", 
             "betapsiO2", "betaphiO2", 
             "betapsistrat", "betagamstrat",
             "N", "gamma", "phi",
-            "psiInt", "phiInt", "gamInt", "p")
+            "psiInt", "phiInt", "gamInt", "p",
+            "log.lik")
+
+# psi.phi.gam (null model)
+( psi.phi.gam <- 
+    jagsUI::jags(jdata_L0mean, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.phi.gam.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.phi.gam,
+        "D:/scallop/dynocc_output/psi.phi.gam.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat <- 
@@ -534,7 +554,7 @@ wanted <- c("Topt1", "width1",
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat <- 
@@ -546,19 +566,76 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.rds")
 
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat
+( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat <- 
+    jagsUI::jags(jdataL0L2a, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat,
+        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat.rds")
+
 # psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
 ( psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat <- 
     jagsUI::jags(jdata_L0maxmax, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
-                      n.thin = 30,
+                      n.thin = 3,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
         "D:/scallop/dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat.rds")
 ```
+# WAIC
+```{r}
+mod0 <- psi.phi.gam
+mod1 <- psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
+mod2 <- psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
+
+loglik_full0 <- mod0$sims.list$log.lik
+loglik_full1 <- mod1$sims.list$log.lik
+loglik_full2 <- mod2$sims.list$log.lik
+
+loglik_wide0 <- 
+  lapply(seq(dim(loglik_full0)[3]), function(x) loglik_full0[ , , x])
+loglik_wide1 <- 
+  lapply(seq(dim(loglik_full1)[3]), function(x) loglik_full1[ , , x])
+loglik_wide2 <- 
+  lapply(seq(dim(loglik_full2)[3]), function(x) loglik_full2[ , , x])
+
+loglik0 <- do.call(cbind, loglik_wide0); dim(loglik0)
+loglik1 <- do.call(cbind, loglik_wide1); dim(loglik1)
+loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
+
+waic0 <- loo::waic(loglik0); waic0
+waic1 <- loo::waic(loglik1); waic1
+waic2 <- loo::waic(loglik2); waic2
+
+# these computed from 3000 posterior samples 2 times...
+#           Estimate    SE
+# elpd_waic  -7315.8  80.1
+# p_waic       197.1   5.0
+# waic       14631.6 160.2
+
+# elpd_waic  -7309.7  80.0
+# p_waic       196.1   5.0
+# waic       14619.4 160.0
+
+# Computed from 9000 by 3712 log-likelihood matrix
+# 
+#           Estimate    SE
+# elpd_waic  -7313.2  80.0
+# p_waic       196.8   5.0
+# waic       14626.4 160.1
+# 
+# 40 (1.1%) p_waic estimates greater than 0.4. We recommend trying loo instead. 
+loo_compare(waic1, waic0)
+```
+
+
 # SMALLER MODELS W/ JUST 1 LINEAR COVARIATE EACH
 # Bundle data for JAGS & run models (mean SBT only)
-# Mean, mean, mean SBT hypothesis
+# Min/Max SBT hypothesis
 # LAG 0 for Persistence; LAGS 0-3 for Colonization
 ```{r}
 # Get known values of z
