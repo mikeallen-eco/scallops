@@ -590,8 +590,12 @@ saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
 ```{r}
 mod0 <- 
   readRDS("D:/scallop/2022_11_12_dynocc_output/psi.phi.gam_waic.rds")
+mod0 <- 
+  readRDS("results/psi.phi.gam_waic.rds")
 mod1 <- 
   readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
+mod1 <- 
+  readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
 mod2 <- psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
 
@@ -610,9 +614,20 @@ loglik0 <- do.call(cbind, loglik_wide0); dim(loglik0)
 loglik1 <- do.call(cbind, loglik_wide1); dim(loglik1)
 loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
 
-waic0 <- loo::waic(loglik0); waic0
+waic0 <- loo::waic(loglik0); waic0 # waic 14477.8; SE158.9
 loo0 <- loo::loo(loglik0); loo0
+# LOOIC: Computed from 9000 by 3712 log-likelihood matrix (ran on Annotate)
+# 
+#          Estimate    SE
+# elpd_loo  -7239.2  79.4
+# p_loo       194.2   4.9
+# looic     14478.5 158.9 # very similar to WAIC, which is assymptotically equivalent
 waic1 <- loo::waic(loglik1); waic1
+loo1 <- loo::loo(loglik1); loo1
+#          Estimate    SE
+# elpd_loo  -7313.5  80.1
+# p_loo       197.1   5.0
+# looic     14627.1 160.1
 waic2 <- loo::waic(loglik2); waic2
 
 # these computed from 3000 posterior samples 2 times...
