@@ -564,7 +564,7 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.rds")
+        "D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat <- 
@@ -584,7 +584,7 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
-        "D:/scallop/dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat.rds")
+        "D:/scallop/2022_11_12_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat_waic.rds")
 ```
 # WAIC
 ```{r}
@@ -597,7 +597,8 @@ mod1 <-
 mod1 <- 
   readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
-mod2 <- psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
+mod2 <- 
+  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
 
 loglik_full0 <- mod0$sims.list$log.lik
 loglik_full1 <- mod1$sims.list$log.lik
@@ -628,19 +629,10 @@ loo1 <- loo::loo(loglik1); loo1
 # elpd_loo  -7313.5  80.1
 # p_loo       197.1   5.0
 # looic     14627.1 160.1
-waic2 <- loo::waic(loglik2); waic2
+waic2 <- loo::waic(loglik2); waic2 # 14626.3 (160.1)
+loo2 <- loo::loo(loglik2); loo2
 
-# these computed from 3000 posterior samples 2 times...
-#           Estimate    SE
-# elpd_waic  -7315.8  80.1
-# p_waic       197.1   5.0
-# waic       14631.6 160.2
-
-# elpd_waic  -7309.7  80.0
-# p_waic       196.1   5.0
-# waic       14619.4 160.0
-
-# Computed from 9000 by 3712 log-likelihood matrix
+# mean-mean model - Computed from 9000 by 3712 log-likelihood matrix
 # 
 #           Estimate    SE
 # elpd_waic  -7313.2  80.0
