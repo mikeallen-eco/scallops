@@ -528,6 +528,30 @@ jdata_L0maxmax <-
     strat = strat_matS)
 str(jdata_L0maxmax)
 
+jdata_L1maxmax <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = maxsbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = maxsbtL1_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L1maxmax)
+
+jdata_L0minmin <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = minsbt_mat, climvar2 = minsbt_mat, 
+    climvar3 = minsbt_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L0minmin)
+
+jdata_L1minmin <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = minsbt_mat, climvar2 = minsbt_mat, 
+    climvar3 = minsbtL1_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L1minmin)
+
 wanted <- c("Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", 
             "betapsiO2", "betaphiO2", 
@@ -574,35 +598,63 @@ saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat,
-        "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat.rds")
+        "D:/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat_waic.rds")
 
 # psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat
 ( psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat <- 
     jagsUI::jags(jdata_L0maxmax, NULL, wanted, 
 "scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
-                      n.thin = 3,
+                      n.thin = 30,
     n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
 
 saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
-        "D:/scallop/2022_11_12_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat_waic.rds")
+        "D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat_waic.rds")
+
+# psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat
+( psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat <- 
+    jagsUI::jags(jdata_L1maxmax, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat,
+        "D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat_waic.rds")
+
+# psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat
+( psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat <- 
+    jagsUI::jags(jdata_L1minmin, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat,
+        "D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat_waic.rds")
 ```
 # WAIC
 ```{r}
 mod0 <- 
-  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.phi.gam_waic.rds")
-mod0 <- 
-  readRDS("results/psi.phi.gam_waic.rds")
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.phi.gam_waic.rds")
+# mod0 <- 
+  # readRDS("results/psi.phi.gam_waic.rds")
 mod1 <- 
   readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
-mod1 <- 
-  readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
+# mod1 <- 
+  # readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
 mod2 <- 
-  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
+
+mod3 <- 
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat_waic.rds")
+
+mod4 <- 
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat_waic.rds")
 
 loglik_full0 <- mod0$sims.list$log.lik
 loglik_full1 <- mod1$sims.list$log.lik
 loglik_full2 <- mod2$sims.list$log.lik
+loglik_full3 <- mod3$sims.list$log.lik
+loglik_full4 <- mod4$sims.list$log.lik
 
 loglik_wide0 <- 
   lapply(seq(dim(loglik_full0)[3]), function(x) loglik_full0[ , , x])
@@ -610,10 +662,16 @@ loglik_wide1 <-
   lapply(seq(dim(loglik_full1)[3]), function(x) loglik_full1[ , , x])
 loglik_wide2 <- 
   lapply(seq(dim(loglik_full2)[3]), function(x) loglik_full2[ , , x])
+loglik_wide3 <- 
+  lapply(seq(dim(loglik_full3)[3]), function(x) loglik_full3[ , , x])
+loglik_wide4 <- 
+  lapply(seq(dim(loglik_full4)[3]), function(x) loglik_full4[ , , x])
 
 loglik0 <- do.call(cbind, loglik_wide0); dim(loglik0)
 loglik1 <- do.call(cbind, loglik_wide1); dim(loglik1)
 loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
+loglik3 <- do.call(cbind, loglik_wide3); dim(loglik3)
+loglik4 <- do.call(cbind, loglik_wide4); dim(loglik4)
 
 waic0 <- loo::waic(loglik0); waic0 # waic 14477.8; SE158.9
 loo0 <- loo::loo(loglik0); loo0
@@ -640,7 +698,15 @@ loo2 <- loo::loo(loglik2); loo2
 # waic       14626.4 160.1
 # 
 # 40 (1.1%) p_waic estimates greater than 0.4. We recommend trying loo instead. 
-loo_compare(waic1, waic0)
+
+waic3 <- loo::waic(loglik3); waic3 # 14628.5 (160.1)
+loo3 <- loo::loo(loglik4); loo3
+
+waic4 <- loo::waic(loglik4); waic4 # 14724.7 (160.9)
+loo4 <- loo::loo(loglik4); loo4
+
+
+loo::loo_compare(waic3, waic4)
 ```
 
 
