@@ -650,11 +650,19 @@ mod3 <-
 mod4 <- 
   readRDS("D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat_waic.rds")
 
+mod5 <- 
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat_waic.rds")
+
+mod8 <- 
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat_waic.rds")
+
 loglik_full0 <- mod0$sims.list$log.lik
 loglik_full1 <- mod1$sims.list$log.lik
 loglik_full2 <- mod2$sims.list$log.lik
 loglik_full3 <- mod3$sims.list$log.lik
 loglik_full4 <- mod4$sims.list$log.lik
+loglik_full5 <- mod5$sims.list$log.lik
+loglik_full8 <- mod8$sims.list$log.lik
 
 loglik_wide0 <- 
   lapply(seq(dim(loglik_full0)[3]), function(x) loglik_full0[ , , x])
@@ -666,12 +674,18 @@ loglik_wide3 <-
   lapply(seq(dim(loglik_full3)[3]), function(x) loglik_full3[ , , x])
 loglik_wide4 <- 
   lapply(seq(dim(loglik_full4)[3]), function(x) loglik_full4[ , , x])
+loglik_wide5 <- 
+  lapply(seq(dim(loglik_full5)[3]), function(x) loglik_full5[ , , x])
+loglik_wide8 <- 
+  lapply(seq(dim(loglik_full8)[3]), function(x) loglik_full8[ , , x])
 
 loglik0 <- do.call(cbind, loglik_wide0); dim(loglik0)
 loglik1 <- do.call(cbind, loglik_wide1); dim(loglik1)
 loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
 loglik3 <- do.call(cbind, loglik_wide3); dim(loglik3)
 loglik4 <- do.call(cbind, loglik_wide4); dim(loglik4)
+loglik5 <- do.call(cbind, loglik_wide5); dim(loglik5)
+loglik8 <- do.call(cbind, loglik_wide8); dim(loglik8)
 
 waic0 <- loo::waic(loglik0); waic0 # waic 14477.8; SE158.9
 loo0 <- loo::loo(loglik0); loo0
@@ -704,6 +718,12 @@ loo3 <- loo::loo(loglik4); loo3
 
 waic4 <- loo::waic(loglik4); waic4 # 14724.7 (160.9)
 loo4 <- loo::loo(loglik4); loo4
+
+waic5 <- loo::waic(loglik5); waic5 # 14731.1 161.0
+loo5 <- loo::loo(loglik5); loo5
+
+waic8 <- loo::waic(loglik8); waic8 # 14685.9 160.8
+loo8 <- loo::loo(loglik8); loo8
 
 
 loo::loo_compare(waic3, waic4)
