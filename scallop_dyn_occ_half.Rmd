@@ -620,6 +620,16 @@ saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
 saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat,
         "D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat_waic.rds")
 
+# psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat
+( psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat <- 
+    jagsUI::jags(jdata_L0minmin, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat,
+        "D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat_waic.rds")
+
 # psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat
 ( psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat <- 
     jagsUI::jags(jdata_L1minmin, NULL, wanted, 
@@ -653,6 +663,9 @@ mod4 <-
 mod5 <- 
   readRDS("D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat_waic.rds")
 
+mod7 <- 
+  readRDS("D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat_waic.rds")
+
 mod8 <- 
   readRDS("D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat_waic.rds")
 
@@ -662,6 +675,7 @@ loglik_full2 <- mod2$sims.list$log.lik
 loglik_full3 <- mod3$sims.list$log.lik
 loglik_full4 <- mod4$sims.list$log.lik
 loglik_full5 <- mod5$sims.list$log.lik
+loglik_full7 <- mod7$sims.list$log.lik
 loglik_full8 <- mod8$sims.list$log.lik
 
 loglik_wide0 <- 
@@ -676,6 +690,8 @@ loglik_wide4 <-
   lapply(seq(dim(loglik_full4)[3]), function(x) loglik_full4[ , , x])
 loglik_wide5 <- 
   lapply(seq(dim(loglik_full5)[3]), function(x) loglik_full5[ , , x])
+loglik_wide7 <- 
+  lapply(seq(dim(loglik_full7)[3]), function(x) loglik_full7[ , , x])
 loglik_wide8 <- 
   lapply(seq(dim(loglik_full8)[3]), function(x) loglik_full8[ , , x])
 
@@ -685,6 +701,7 @@ loglik2 <- do.call(cbind, loglik_wide2); dim(loglik2)
 loglik3 <- do.call(cbind, loglik_wide3); dim(loglik3)
 loglik4 <- do.call(cbind, loglik_wide4); dim(loglik4)
 loglik5 <- do.call(cbind, loglik_wide5); dim(loglik5)
+loglik7 <- do.call(cbind, loglik_wide7); dim(loglik7)
 loglik8 <- do.call(cbind, loglik_wide8); dim(loglik8)
 
 waic0 <- loo::waic(loglik0); waic0 # waic 14477.8; SE158.9
@@ -721,6 +738,9 @@ loo4 <- loo::loo(loglik4); loo4
 
 waic5 <- loo::waic(loglik5); waic5 # 14731.1 161.0
 loo5 <- loo::loo(loglik5); loo5
+
+waic7 <- loo::waic(loglik7); waic7 # 14682.6 160.8
+loo7 <- loo::loo(loglik7); loo7
 
 waic8 <- loo::waic(loglik8); waic8 # 14685.9 160.8
 loo8 <- loo::loo(loglik8); loo8
