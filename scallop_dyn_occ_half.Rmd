@@ -536,6 +536,14 @@ jdata_L1maxmax <-
     strat = strat_matS)
 str(jdata_L1maxmax)
 
+jdata_L2maxmax <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = maxsbt_mat, climvar2 = maxsbt_mat, 
+    climvar3 = maxsbtL2_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L2maxmax)
+
 jdata_L0minmin <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
     n = nmat, climvar1 = minsbt_mat, climvar2 = minsbt_mat, 
@@ -552,6 +560,14 @@ jdata_L1minmin <-
     strat = strat_matS)
 str(jdata_L1minmin)
 
+jdata_L2minmin <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymat,
+    n = nmat, climvar1 = minsbt_mat, climvar2 = minsbt_mat, 
+    climvar3 = minsbtL2_mat, z = z,  
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS,
+    strat = strat_matS)
+str(jdata_L2minmin)
+
 wanted <- c("Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", 
             "betapsiO2", "betaphiO2", 
@@ -559,16 +575,6 @@ wanted <- c("Topt1", "width1",
             "N", "gamma", "phi",
             "psiInt", "phiInt", "gamInt", "p",
             "log.lik")
-
-# psi.phi.gam (null model)
-( psi.phi.gam <- 
-    jagsUI::jags(jdata_L0mean, NULL, wanted, 
-"scripts/scal_dyn_occ_psi.phi.gam.txt",
-                      n.thin = 30,
-    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
-
-saveRDS(psi.phi.gam,
-        "D:/scallop/2022_11_12_dynocc_output/psi.phi.gam_waic.rds")
 
 # psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat
 ( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat <- 
@@ -620,6 +626,16 @@ saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbt.strat,
 saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat,
         "D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL1.strat_waic.rds")
 
+# psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL2.strat
+( psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL2.strat <- 
+    jagsUI::jags(jdata_L2maxmax, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL2.strat,
+        "D:/scallop/2023_01_dynocc_output/psi.maxsbt.o2.strat.phi.maxsbt.o2.gam.maxsbtL2.strat_waic.rds")
+
 # psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat
 ( psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat <- 
     jagsUI::jags(jdata_L0minmin, NULL, wanted, 
@@ -639,6 +655,16 @@ saveRDS(psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbt.strat,
 
 saveRDS(psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat,
         "D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL1.strat_waic.rds")
+
+# psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL2.strat
+( psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL2.strat <- 
+    jagsUI::jags(jdata_L2minmin, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 30,
+    n.chains=3, n.iter=90000, n.adapt=10000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL2.strat,
+        "D:/scallop/2023_01_dynocc_output/psi.minsbt.o2.strat.phi.minsbt.o2.gam.minsbtL2.strat_waic.rds")
 ```
 # WAIC
 ```{r}
@@ -647,7 +673,7 @@ mod0 <-
 # mod0 <- 
   # readRDS("results/psi.phi.gam_waic.rds")
 mod1 <- 
-  readRDS("D:/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
+  readRDS("/Users/mikea/Documents/mikedata/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 # mod1 <- 
   # readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
@@ -1252,6 +1278,142 @@ np/pp/gp
 ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_gam_phi.png",
        height = 9, width = 4, dpi = 400)
 
+```
+# Fig. S1 - Plot mean 'environmental effects' over time (for supp.)
+```{r}
+# collecting posteriors
+mean_phi_int_v <- qlogis(apply(mod1$sims.list$phiInt,1,mean))
+mean_gam_int_v <- qlogis(apply(mod1$sims.list$gamInt,1,mean))
+
+o2_matS2red_mat <- o2_matS[,1:31]; dim(o2_matS2red_mat)
+strat_matSred <- strat_matS[,1:31]; dim(strat_matSred)
+T_phi <- meansbt_mat[,1:31]; dim(T_phi)
+T_gam <- meansbtL1_mat[,1:31]; dim(T_gam)
+betaphiO2_v <- mod1$sims.list$betaphiO2
+betagamstrat_v <- mod1$sims.list$betagamstrat
+
+Topt_phi <- mod1$sims.list$Topt2
+W_phi <- mod1$sims.list$width2
+Topt_gam <- mod1$sims.list$Topt3
+W_gam <- mod1$sims.list$width3
+
+pred1_array <- array(NA, dim = c(116, 31, 9000))
+pred2_array <- array(NA, dim = c(116, 31, 9000))
+pred3_array <- array(NA, dim = c(116, 31, 9000))
+for(i in 1:116) {
+  
+  for (y in 1:31) { 
+    
+    for (z in 1:9000) {
+
+# part 1: the logistic part
+pred1_array[i,y,z] <- plogis(mean_phi_int_v[z] 
+                            + betaphiO2_v[z]*o2_matS2red_mat[i,y])    
+
+# part 2: the Gaussian part
+pred2_array[i,y,z] <- exp(-0.5*((T_phi[i,y]-Topt_phi[z])/W_phi[z])^2)
+
+    }
+    }
+}
+
+# part 3: combine them
+pred3_array <- pred1_array * pred2_array
+
+dim(pred3_array)
+
+predenv_matrix <- apply(pred3_array, c(2,3), mean)
+
+dim(predenv_matrix)
+predenv = apply(predenv_matrix, 1, 
+                function(x) quantile(x, c(0.025, .1, 0.5, .9, 0.975))) %>%
+  t() %>%
+  as.data.frame() %>%
+  rename(q2.5 = 1, q10 = 2, med = 3, q90 = 4, q97.5 = 5) %>%
+  mutate(year = 1983:2013)
+
+(extenv <- 
+predenv %>%
+  ggplot() +
+  geom_line(aes(x = year, y = 1-med)) +
+  geom_ribbon(aes(x = year, ymin = 1-q2.5, ymax = 1-q97.5),
+              fill = "darkgray", alpha = 0.5) +
+  geom_ribbon(aes(x = year, ymin = 1-q10, ymax = 1-q90),
+              fill = "darkgray", alpha = 0.5) +
+  scale_y_continuous(limits = c(0,0.5)) +
+  labs(x = "", y = "Mean environmental effects\n(predictions w/ annual intercept set at mean)",
+       title = "Extinction rate") +
+  theme_bw() +
+  theme(text = element_text(size = 14))
+)
+
+ggsave("figures/final_figs/SupS1_enveffects_over_time_ext.jpg",
+       height = 5, width = 5, dpi = 400)
+
+
+# phi = (1+e^((intphi + oxygen*β ) ) )^(-1) × 
+# e^(-0.5((T_(ip,y )- 〖Topt〗_3)/W_3 )^2 )
+
+# NOW WITH COLONIZATION
+
+pred1_array2 <- array(NA, dim = c(116, 31, 9000))
+pred2_array2 <- array(NA, dim = c(116, 31, 9000))
+pred3_array2 <- array(NA, dim = c(116, 31, 9000))
+for(i in 1:116) {
+  
+  for (y in 1:31) { 
+    
+    for (z in 1:9000) {
+
+# part 1: the logistic part
+pred1_array2[i,y,z] <- plogis(mean_gam_int_v[z] 
+                            + betagamstrat_v[z]*strat_matSred[i,y])    
+
+# part 2: the Gaussian part
+pred2_array2[i,y,z] <- exp(-0.5*((T_gam[i,y]-Topt_gam[z])/W_gam[z])^2)
+
+    }
+    }
+}
+
+# part 3: combine them
+pred3_array2 <- pred1_array2 * pred2_array2
+
+dim(pred3_array2)
+
+predenv_matrix2 <- apply(pred3_array2, c(2,3), mean)
+
+dim(predenv_matrix2)
+predenv2 = apply(predenv_matrix2, 1, 
+                function(x) quantile(x, c(0.025,.1, 0.5, .9,0.975))) %>%
+  t() %>%
+  as.data.frame() %>%
+  rename(q2.5 = 1, q10 = 2, med = 3, q90 = 4, q97.5 = 5) %>%
+  mutate(year = 1983:2013)
+
+(colenv <- 
+predenv2 %>%
+  ggplot() +
+  geom_line(aes(x = year, y = med)) +
+  geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5),
+              fill = "darkgray", alpha = 0.5) +  
+  geom_ribbon(aes(x = year, ymin = q10, ymax = q90),
+              fill = "darkgray", alpha = 0.5) +
+  scale_y_continuous(limits = c(0,0.5)) +
+  labs(x = "", y = "Mean environmental effects\n(predictions w/ annual intercept set at mean)",
+       title = "Colonization rate") +
+  theme_bw() +
+  theme(text = element_text(size = 14)))
+
+ggsave("figures/final_figs/SupS1_enveffects_over_time_col.jpg",
+       height = 5, width = 5, dpi = 400)
+
+library(patchwork)
+
+extenv / colenv
+
+ggsave("figures/final_figs/SupS1_enveffects_over_time_both.jpg",
+       height = 9, width = 4, dpi = 400)
 ```
 
 
@@ -2198,3 +2360,5 @@ saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL2.o2,
 saveRDS(psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL3.o2,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbtL0.o2.strat.gam.meansbtL3.o2.strat.rds")
 ```
+
+
