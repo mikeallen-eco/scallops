@@ -108,7 +108,7 @@ ymat <- dat_train_dens80_occ %>%
   as.matrix()
 
 # matrix of number of "detected" samples per cell and year 
-    # including only those that were "bonanzas" (top 5% of hauls)
+    # including only those that were "bonanzas" (top 20% of hauls)
 ymatb <- dat_train_dens80_occ %>%
   pivot_wider(id_cols = grid,
               names_from = year,
@@ -678,7 +678,7 @@ mod1 <-
   # readRDS("results/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat_waic.rds")
 
 mod2 <- 
-  readRDS("D:/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
+  readRDS("/Users/mikea/Documents/mikedata/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat_waic.rds")
 
 mod3 <- 
   readRDS("D:/scallop/2023_01_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL2.strat_waic.rds")
@@ -836,9 +836,16 @@ strat_matS <- wiqid::standardize(strat_mat)
 jdata_L0mean.b <- 
   list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
     n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
-    climvar3 = meansbt_mat, z = z,  depth = depth_matS,
+    climvar3 = meansbt_mat, z = z,  #depth = depth_matS,
     O2a = o2_matS, O2b = o2_matS, O2c = o2_matS, strat = strat_matS)
 str(jdata_L0mean.b)
+
+jdata_L1mean.b <- 
+  list(nSites = nrow(ymat), nYears = ncol(ymat), y = ymatb,
+    n = nmat, climvar1 = meansbt_mat, climvar2 = meansbt_mat, 
+    climvar3 = meansbtL1_mat, z = z,  #depth = depth_matS,
+    O2a = o2_matS, O2b = o2_matS, O2c = o2_matS, strat = strat_matS)
+str(jdata_L1mean.b)
 
 wanted <- c("Topt1", "width1", 
             "Topt2", "width2", "Topt3", "width3", 
@@ -856,6 +863,16 @@ wanted <- c("Topt1", "width1",
 
 saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b,
         "D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")
+
+# psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.b
+( psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.b <- 
+    jagsUI::jags(jdata_L1mean.b, NULL, wanted, 
+"scripts/scal_dyn_occ_psi.sbt.o2.strat.phi.sbt.o2.gam.sbt.strat.txt",
+                      n.thin = 10,
+    n.chains=3, n.iter=10000, n.adapt=1000, DIC=T, parallel=TRUE) )
+
+saveRDS(psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.b,
+        "/Users/mikea/Documents/mikedata/scallop/2023_06_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbtL1.strat.b.rds")
 
 
 ```
@@ -1890,10 +1907,10 @@ colext %>%
 ggsave("figures/dynocc/scallop_dynocc_predicted_colext_rmeanO2strat_mmeanO2strat.png",
         height = 5, width = 5, dpi = 400)
 ```
-# Bonanza (top 90% or 95%) model: Map mean colonization - extinction by patch
+# Bonanza (top 80% abundance) model: Map mean colonization - extinction by patch
 ```{r}
 psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b <- 
-  readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.phi.meansbtL0.o2.gam.meansbtL1.o2.b.rds")
+  readRDS("/Users/mikea/Documents/mikedata/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")
 
 # get posteriors for colonization (by cell and year)
 col.p <- 

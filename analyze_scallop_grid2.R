@@ -70,8 +70,8 @@ T_dep_recruitment = 1 #
 spawner_recruit_relationship = 0
 run_forecast=0
 time_varying_f = TRUE
-btemp_meas_rec <- "min" # "min", "mean", "max", or "O2"
-btemp_meas_mort <- "min" # "min", "mean", "max", or "O2"
+btemp_meas_rec <- "mean" # "min", "mean", "max", or "O2"
+btemp_meas_mort <- "mean" # "min", "mean", "max", or "O2"
 wt_at_age <- rep(1, 14) # not used in scallop model so far
 
 if(time_varying_f==TRUE){
