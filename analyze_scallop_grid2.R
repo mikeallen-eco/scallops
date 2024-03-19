@@ -290,7 +290,7 @@ dat_dens %>%
     geom_tile(aes(x = -grid_lon, y = grid_lat, fill = mean_dens)) +
   geom_text(aes(x = -grid_lon, y = grid_lat, label = patch), color = "white") +
   viridis::scale_fill_viridis()
-  ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
+  # ggsave(here(plotsave, "AA_grid_map.png"), height = 6, width = 8, dpi = 400)
 
 # plot to see which patches were selected (excluding small scallops < 80 mm)
 dat_dens80 %>%
@@ -305,25 +305,25 @@ dat_dens80 %>%
   geom_text(aes(x = -grid_lon, y = grid_lat, label = patch), color = "white") +
   viridis::scale_fill_viridis() +
   labs(title = "Excluding small scallops (< 80 mm)")
-ggsave(here(plotsave, "AA_grid_map_large_only.png"), height = 6, width = 8, dpi = 400)
+# ggsave(here(plotsave, "AA_grid_map_large_only.png"), height = 6, width = 8, dpi = 400)
 
 # map where the NA values are
-dat_dens %>% 
-  left_join(select(use_patches, grid, dens_NA, sbt_NA), by = "grid") %>%
-  group_by(grid, patch) %>%
-  summarise(dens_NA = mean(dens_NA, na.rm = T),
-            sbt_NA = mean(sbt_NA, na.rm = T)) %>%
-  mutate(grid_lat = substr(grid, 1, 5),
-         grid_lon = as.numeric(substr(grid, 6, 11))) %>%
-  ggplot() +
-  geom_tile(aes(x = -grid_lon, y = grid_lat, fill = dens_NA)) +
-  geom_text(aes(x = -grid_lon, y = grid_lat, label = dens_NA), color = "white") +
-  viridis::scale_fill_viridis() +
-  theme_bw() +
-  labs(title = season, fill = "NA dens\n(years)", x = "", y = "")
-ggsave(here(plotsave,
-            paste0("AAAA_densNA_years_grid_map_",
-              season, ".png")), height = 6, width = 8, dpi = 400)
+# dat_dens %>% 
+#   left_join(select(use_patches, grid, dens_NA, sbt_NA), by = "grid") %>%
+#   group_by(grid, patch) %>%
+#   summarise(dens_NA = mean(dens_NA, na.rm = T),
+#             sbt_NA = mean(sbt_NA, na.rm = T)) %>%
+#   mutate(grid_lat = substr(grid, 1, 5),
+#          grid_lon = as.numeric(substr(grid, 6, 11))) %>%
+#   ggplot() +
+#   geom_tile(aes(x = -grid_lon, y = grid_lat, fill = dens_NA)) +
+#   geom_text(aes(x = -grid_lon, y = grid_lat, label = dens_NA), color = "white") +
+#   viridis::scale_fill_viridis() +
+#   theme_bw() +
+#   labs(title = season, fill = "NA dens\n(years)", x = "", y = "")
+# ggsave(here(plotsave,
+#             paste0("AAAA_densNA_years_grid_map_",
+#               season, ".png")), height = 6, width = 8, dpi = 400)
 
 # split into train and test data
 dat_test_lengths <- dat_lengths %>% 
