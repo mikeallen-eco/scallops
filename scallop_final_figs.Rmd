@@ -253,13 +253,14 @@ ggsave("figures/final_figs/B_obs_pred_maps_h_z5.png",
 ```
 # Create time series panel plots
 ```{r}
+# rds not working: load plots using scallop_dyn_occ_half.Rmd script instead
 np <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches.rds")
 pp <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_ext.rds")
 gp <- readRDS("figures/rmeanstrat_mmeanO2_h_dynocc/Mean_col.rds")
 
 library(patchwork)
 np/pp/gp
-ggsave("figures/final_figs/D_N_gam_phi.png",
+ggsave("figures/final_figs/D_N_gam_phi_20240319.png",
        height = 9, width = 4, dpi = 400)
 
 ```

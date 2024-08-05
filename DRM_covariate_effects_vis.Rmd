@@ -397,72 +397,125 @@ ggsave("figures/rmeanstrat_mmeanO2_h/scallop_change_in_modeled_catch_h_z.png",
 ```
 # Time series of abund, mean survival & mean rec across patches
 ```{r}
+# OLD CODE
+# ta.ts_rec <- dat_dens80 %>%
+#   left_join(raw_lookup, by = "year") %>%
+#   mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
+#                           mean(rm$Topt_rec))/mean(rm$width_rec))^2),
+#          O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
+#                           mean(rm$stratbetarec)*strat),
+#          ta = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp((mean(rm$sigma_r)^2) / 2),
+#          ta.raw = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
+#          ta.raw.only = mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
+#          ta2 = wiqid::standardize2match(ta, rec.mat.df$T_adjust),
+#          lta = log(ta)
+#          ) %>%
+#   group_by(year) %>%
+#   summarize(across(where(is.numeric), mean, na.rm = T))
+# A x exp(ry-(SD2/2)) x tadj x plogis(logistic strat effect)
 
-# attempt at mortality with rowwise posterior calcs
-ta.ts_mort <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
-temp_adjust <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
-O2strat_adjust <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
+# attempt at rowwise posterior calcs
+ta.ts_rec_mat <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
+# rpart <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
+# temp_adjust <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
+# strat_adjust <- matrix(NA, nrow = 600, ncol = nrow(dat_dens80))
+strat_vect <- wiqid::standardize(dat_dens80$strat)
 
-for(i in 1:nrow(dat_dens80)){ # 1 col for each row of dat_dens80, 1 row for each iteration
-  for(j in 1:600){
-temp_adjust[i,j] <- exp(-0.5 * ((dat_dens80$climvar_mort[i] - 
-                          rm$Topt_mort[j])/rm$width_mort[j])^2)
+# for calculating recruitment "by hand"
+# for(i in 1:nrow(dat_dens80)){ # 1 col for each row of dat_dens80, 1 row for each iteration
+  # for(j in 1:600){
+library(parallel)
+ts_rec_list <- lapply(1:nrow(dat_dens80), function(i){
+message("collumn ", i)
 
-O2strat_adjust[i,j] <- plogis(rm$linbeta0mort[j] + 
-                          rm$O2betamort[j]*O2),
-         ta = temp_adjust*O2strat_adjust*exp(-0.35)
-         ) %>%
-  group_by(year) %>%
-  summarize(across(where(is.numeric), mean, na.rm = T)) %>%
-  arrange(year) %>%
-  mutate(f = f[14,],
-         mort_mod = 1-apply(rm$surv[,,14,], c(3), mean),
-         mort_calc = 1-temp_adjust*O2strat_adjust*exp(-(0.35+f)),
-         mort_nofish = 1-ta
-         )
-}
-}
-# calculate survival by cell and year
+ta.ts_rec <- lapply(1:600, function(j) {
 
-ta.ts_mort <- dat_dens80 %>%
-  mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
-                          mean(rm$Topt_mort))/mean(rm$width_mort))^2),
-         O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
-                          mean(rm$O2betamort)*O2),
-         ta = temp_adjust*O2strat_adjust*exp(-0.35)
-         ) %>%
-  group_by(year) %>%
-  summarize(across(where(is.numeric), mean, na.rm = T)) %>%
-  arrange(year) %>%
-  mutate(f = f[14,],
-         mort_mod = 1-apply(rm$surv[,,14,], c(3), mean),
-         mort_calc = 1-temp_adjust*O2strat_adjust*exp(-(0.35+f)),
-         mort_nofish = 1-ta
-         )
+rpart_tmp <- data.frame(raw = rm$raw[j,], 
+                        year = 1983:2014)
 
-raw_lookup <- data.frame(year = 1983:2014, 
-                         raw = apply(rm$raw, 2, mean))
+rpart_tmp2 <- dat_dens80 %>%
+  select(year) %>%
+  left_join(rpart_tmp, by = join_by(year))
 
-ta.ts_rec <- dat_dens80 %>%
-  left_join(raw_lookup, by = "year") %>%
-  mutate(temp_adjust = exp(-0.5 * ((climvar_rec - 
-                          mean(rm$Topt_rec))/mean(rm$width_rec))^2),
-         O2strat_adjust = plogis(mean(rm$linbeta0rec) + 
-                          mean(rm$stratbetarec)*strat),
-         ta = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp((mean(rm$sigma_r)^2) / 2),
-         ta.raw = temp_adjust*O2strat_adjust*mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
-         ta.raw.only = mean(rm$mean_recruits)*exp(raw-((mean(rm$sigma_r)^2) / 2)),
-         ta2 = wiqid::standardize2match(ta, rec.mat.df$T_adjust),
-         lta = log(ta)
-         ) %>%
-  group_by(year) %>%
-  summarize(across(where(is.numeric), mean, na.rm = T))
+rpart <- rm$mean_recruits[j] * exp(rpart_tmp2$raw[i]-((rm$sigma_r[j]^2)/2))
 
+temp_adjust <- exp(-0.5 * ((dat_dens80$climvar_rec[i] - 
+                          rm$Topt_rec[j])/rm$width_rec[j])^2)
 
-moddens_df <- apply(apply(rm$dens_p_y_hat80, c(2,3), mean), 2, function(x) {cbind(mean(x), quantile(x, c(.1, .25, 0.5, .75, 0.9)))}) %>%
+strat_adjust <- plogis(rm$linbeta0rec[j] + 
+                          rm$stratbetarec[j]*strat_vect[i])
+
+ta.ts_rec <- rpart * temp_adjust * strat_adjust
+return(ta.ts_rec)
+  })
+
+ta.ts_rec_vect <- do.call(c,ta.ts_rec)
+return(ta.ts_rec_vect)
+}) #, mc.cores = 6)
+
+ta.ts_rec_mat <- do.call(cbind, ts_rec_list)
+
+ta.ts_rec_df <- ta.ts_rec_mat %>%
+  as.data.frame()
+
+# write.csv(ta.ts_rec_df, "output/ta.ts_rec_df.csv", row.names = F)
+ta.ts_rec_df <- read.csv("output/ta.ts_rec_df.csv")
+ta.ts_rec_mat <- ta.ts_rec_df %>%
+  as.matrix()
+tmp1 <- ta.ts_rec_mat %>%
   t() %>%
+  aggregate(., by = list(dat_dens80$year), 
+            mean, na.rm= T) %>%
+  t()
+tmp1 <- tmp1[-1,]
+
+# make rec dataframe
+ # summarize the 600 posterior draws of the "mean across cells" of rec for each year
+rec_ts_df <- apply(tmp1, 2, FUN = function(x) quantile(x, c(0.025, 0.1, 0.5, 0.9, 0.975))) %>% 
+  t() %>% 
   as.data.frame() %>%
-  select(mean = 1, q10 = 6, q25 = 7, q50 = 8, q75 = 9, q90 = 10)
+  rename(q2.5 = 1, q10 = 2, rec = 3, q90 = 4, q97.5 = 5) %>%
+  mutate(recZ = wiqid::standardize(rec),
+         q2.5Z = wiqid::standardize2match(q2.5, rec), 
+         q10Z = wiqid::standardize2match(q10, rec),
+         q90Z = wiqid::standardize2match(q90, rec), 
+         q97.5Z = wiqid::standardize2match(q97.5, rec)) %>%
+  mutate(year = 1983:2014)
+
+# test plot (could use this data for supp plot supporting fishing mortality statement)
+plot(rec_ts_df$recZ, type = "l", ylim = c(-2, 5))
+points(rec_ts_df$q2.5Z, type = "l")
+points(rec_ts_df$q10Z, type = "l")
+points(rec_ts_df$q90Z, type = "l")
+points(rec_ts_df$q97.5Z, type = "l")
+
+# OLD CODE
+# ta.ts_mort <- dat_dens80 %>%
+#   mutate(temp_adjust = exp(-0.5 * ((climvar_mort - 
+#                           mean(rm$Topt_mort))/mean(rm$width_mort))^2),
+#          O2strat_adjust = plogis(mean(rm$linbeta0mort) + 
+#                           mean(rm$O2betamort)*O2),
+#          ta = temp_adjust*O2strat_adjust*exp(-0.35)
+#          ) %>%
+#   group_by(year) %>%
+#   summarize(across(where(is.numeric), mean, na.rm = T)) %>%
+#   arrange(year) %>%
+#   mutate(f = f[14,],
+#          mort_mod = 1-apply(rm$surv[,,14,], c(3), mean),
+#          mort_calc = 1-temp_adjust*O2strat_adjust*exp(-(0.35+f)),
+#          mort_nofish = 1-ta
+#          )
+
+raw_lookup <- data.frame(year = 1983:2014,
+                         raw = apply(rm$raw, 2, mean))
+plot(wiqid::standardize(raw_lookup$raw), type = "l")
+
+
+
+# moddens_df <- apply(apply(rm$dens_p_y_hat80, c(2,3), mean), 2, function(x) {cbind(mean(x), quantile(x, c(.1, .25, 0.5, .75, 0.9)))}) %>%
+#   t() %>%
+#   as.data.frame() %>%
+#   select(mean = 1, q10 = 6, q25 = 7, q50 = 8, q75 = 9, q90 = 10)
 
 # make dens dataframe
 tmp1 <- apply(rm$dens_p_y_hat80, c(1,3), mean) # average across cells within years (600 times)
@@ -528,26 +581,23 @@ measdens <- data.frame(year = 1983:2014,
     guides(fill = "none") 
 )
 
-(mortality = data.frame(
-  year = rep(1983:2014, 2),
-  mort = c(ta.ts_mort$mort_mod,
-       ta.ts_mort$mort_nofish),
-       morttype = c(rep("Fishing + environmental", 32),
-                    rep("Environmental only", 32))) %>%
-    mutate(order = case_when(morttype == "Fishing + environmental" ~
-                               1,
-                             TRUE ~ 2)) %>%
-    mutate(morttype = forcats::fct_reorder(morttype, .x = order)) %>%
+(mortality = mort_ts_df %>%
     ggplot() +
-    geom_line(aes(x = year, y = mort, linetype = morttype)) +
-    scale_color_manual(values = c("firebrick", "steelblue")) +
-    labs(y = "Mean mortality", linetype = "", x = "") +
+    geom_ribbon(aes(x = year, ymin = q10, ymax = q90),
+              alpha = 0.5) +
+    geom_ribbon(aes(x = year, ymin = q2.5, ymax = q97.5),
+              alpha = 0.5) +
+    geom_line(aes(x = year, y = mort), linewidth = 1) +
+    scale_fill_manual(values = c("darkgray", "darkgray")) +
+    scale_y_continuous(limits = c(0.5, 0.95)) +
+    labs(y = "Mean mortality (across all cells)", x = "") +
     theme_bw() +
     theme(text = element_text(size = 14),
-          legend.position = c(0.99,0.99),
-          legend.justification = c(1,1),
+          legend.position = c(.01,0.99),
+          legend.justification = c(0,1),
           legend.text=element_text(size=8),
-          legend.title=element_text(size=2))
+          legend.title=element_text(size=2)) +
+    guides(fill = "none") 
 )
 
 (recruit = data.frame(

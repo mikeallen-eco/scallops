@@ -1146,9 +1146,9 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/col_phi_colextmap2.png",
 ```
 # plot predicted N over time
 ```{r}
-mod <- readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
+mod <- readRDS("/Users/mikea/Documents/mikedata/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.rds")
 
-modb <- readRDS("D:/scallop/dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")  
+modb <- readRDS("/Users/mikea/Documents/mikedata/scallop/2022_11_12_dynocc_output/psi.meansbt.o2.strat.phi.meansbt.o2.gam.meansbt.strat.b.rds")  
 
 Nest <- dat_train_dens80_occ %>%
   group_by(year) %>%
@@ -1190,7 +1190,8 @@ N.plot <- data.frame(
     function(x)quantile(x, 0.9)),
   type = "Abundant 80 mm +")
 ) %>%
-  mutate(type = forcats::fct_reorder(type, c(rep(1,32),rep(2,32))))
+  mutate(type = forcats::fct_reorder(type, c(rep(1,32),rep(2,32))),
+         N.meas = c(Nest$gridpres, Nest$gridpresb))
 
 gamb <- apply(apply(modb$sims.list$gamma, c(1,3), mean), 2, 
       function(x)quantile(x, c(0.5)))
@@ -1229,6 +1230,8 @@ phi.plot <- apply(apply(mod$sims.list$phi, c(1,3), mean), 2,
               alpha = 0.25) +
   geom_line(aes(x = year, y = N, linetype = type),
             size = 1) +
+  geom_line(aes(x = year, y = N.meas, group = type),
+            linetype = 3) +
   scale_color_manual(values = c("firebrick", "steelblue")) +
   scale_fill_manual(values = c("firebrick", "steelblue")) +
   labs(fill = "", color = "",
@@ -1253,8 +1256,8 @@ ggsave("figures/rmeanstrat_mmeanO2_h_dynocc/N_occ_patches_over_time.png",
               alpha = 0.25) +
   geom_line(aes(x = year, y = col),
             size = 1) +
-  # geom_line(aes(x = year, y = gamb),
-  #           size = 1, linetype = 3) +
+  geom_line(aes(x = year, y = gamb),
+            size = 1, linetype = 2) +
   labs(fill = "", color = "",
        y = "Mean colonization rate",
        x = "") +
